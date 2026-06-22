@@ -1,0 +1,1698 @@
+<!-- ===================================================================
+     MatchMeal — a peer-to-peer "where shall we eat?" negotiator.
+     Two (or more) people connect over a real WebRTC data channel. Each
+     person keeps their own dining preferences ON THEIR OWN DEVICE. A
+     local LLM (Chrome built-in Prompt API, falling back to on-device
+     Gemma via LiteRT/WebGPU) acts as each person's food concierge:
+     it searches the real world for nearby restaurants (OpenStreetMap),
+     proposes options, and — crucially — answers other people's agents
+     on their owner's behalf ("is this place ok? any concerns?"). The
+     organiser keeps proposing until everyone's agent is satisfied.
+     Nothing leaves your device except the verdicts you choose to share.
+
+     Copyright (c) 2026 woodyhoko. All Rights Reserved.
+     This source is provided for viewing only. No license is granted to use,
+     copy, modify, distribute, host, or create derivative works of any part of
+     it without the prior express written permission of the copyright holder.
+     See the LICENSE file. Do not remove this notice.
+     ================================================================== -->
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>MatchMeal — Find a table everyone loves</title>
+    <meta name="description"
+        content="A peer-to-peer dining matchmaker. Connect to friends over WebRTC, keep your taste profile on-device, and let each person's on-device AI negotiate the perfect restaurant for the whole table." />
+    <meta name="author" content="woodyhoko" />
+    <meta name="copyright" content="Copyright (c) 2026 woodyhoko. All Rights Reserved." />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #160f0c;
+            --surface: #221813;
+            --surface-2: #2d201a;
+            --surface-hover: #3a2a21;
+            --primary: #ff7a4d;
+            --primary-soft: rgba(255, 122, 77, .15);
+            --amber: #ffb454;
+            --amber-soft: rgba(255, 180, 84, .15);
+            --berry: #e85d8c;
+            --berry-soft: rgba(232, 93, 140, .15);
+            --ok: #57c98a;
+            --ok-soft: rgba(87, 201, 138, .16);
+            --warn: #f0a040;
+            --warn-soft: rgba(240, 160, 64, .16);
+            --bad: #f06464;
+            --bad-soft: rgba(240, 100, 100, .16);
+            --ink: #fbf1e9;
+            --muted: #c2a999;
+            --faint: #9a8073;
+            --line: rgba(255, 230, 210, .1);
+            --glass: rgba(34, 24, 19, .72);
+            --glass-border: rgba(255, 230, 210, .11);
+            --font: 'Outfit', system-ui, sans-serif;
+            --head: 'Fraunces', Georgia, serif;
+            --mono: 'JetBrains Mono', ui-monospace, monospace;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--bg);
+            background-image:
+                radial-gradient(circle at 12% 8%, rgba(255, 122, 77, .14) 0%, transparent 44%),
+                radial-gradient(circle at 88% 12%, rgba(255, 180, 84, .12) 0%, transparent 42%),
+                radial-gradient(circle at 50% 116%, rgba(232, 93, 140, .12) 0%, transparent 54%);
+            color: var(--ink);
+            font-family: var(--font);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes slideUp { from { transform: translateY(14px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+        @keyframes pulse { 0% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.7); opacity: 0 } 100% { transform: scale(1); opacity: 0 } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pop { 0% { transform: scale(.6); opacity: 0 } 60% { transform: scale(1.08) } 100% { transform: scale(1); opacity: 1 } }
+
+        a { color: var(--amber); }
+
+        /* ---------- Loader / model gate ---------- */
+        .loader-overlay {
+            position: fixed; inset: 0; z-index: 2000;
+            display: flex; align-items: center; justify-content: center;
+            background: var(--bg);
+            background-image:
+                radial-gradient(circle at 22% 22%, rgba(255, 122, 77, .18) 0, transparent 45%),
+                radial-gradient(circle at 78% 80%, rgba(255, 180, 84, .15) 0, transparent 45%);
+            padding: 24px;
+        }
+        .gate { text-align: center; max-width: 520px; animation: fadeIn .8s ease-out; }
+        .gate .logo { font-size: 3.4rem; line-height: 1; margin-bottom: 10px; filter: drop-shadow(0 8px 18px rgba(255,122,77,.4)); }
+        .gate .kicker { text-transform: uppercase; letter-spacing: .34em; font-size: .72rem; color: var(--muted); margin-bottom: 12px; }
+        .gate h1 {
+            font-family: var(--head); font-weight: 700; font-size: 3.1rem; margin: 0 0 .4rem; letter-spacing: -.01em;
+            background: linear-gradient(110deg, var(--primary), var(--amber) 60%, var(--berry));
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .gate .lede { color: var(--muted); font-size: 1.04rem; line-height: 1.6; margin: 0 auto 22px; max-width: 440px; }
+        .gate-note { font-size: .94rem; line-height: 1.55; color: var(--muted); margin: 18px auto 0; max-width: 450px; }
+        .gate-sub { font-size: .76rem; line-height: 1.5; color: var(--faint); margin-top: 14px; }
+
+        .backend-chip {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 7px 15px; border-radius: 999px; font-size: .82rem; font-weight: 500;
+            background: var(--surface-2); border: 1px solid var(--line); margin-bottom: 20px;
+        }
+        .backend-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+        .backend-chip.ok .dot { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
+        .backend-chip.gemma .dot { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+
+        .progress-bar { width: 320px; max-width: 80vw; height: 6px; background: var(--surface); border-radius: 3px; margin: 22px auto 0; overflow: hidden; }
+        .progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--primary), var(--amber)); transition: width .3s ease; }
+
+        /* ---------- Buttons ---------- */
+        .btn {
+            font-family: var(--font); font-size: .92rem; font-weight: 600;
+            border: none; border-radius: 12px; padding: 11px 20px; cursor: pointer;
+            color: #2a1206; background: linear-gradient(120deg, var(--primary), var(--amber));
+            transition: transform .15s, box-shadow .15s, opacity .15s;
+            box-shadow: 0 8px 22px rgba(255, 122, 77, .28);
+        }
+        .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(255, 122, 77, .38); }
+        .btn:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
+        .btn-ghost { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); box-shadow: none; }
+        .btn-ghost:hover:not(:disabled) { background: var(--surface-hover); transform: translateY(-1px); box-shadow: none; }
+        .btn-sm { padding: 8px 13px; font-size: .8rem; border-radius: 10px; }
+        .btn-block { width: 100%; }
+        .icon-btn {
+            background: var(--surface-2); border: 1px solid var(--line); color: var(--muted);
+            width: 32px; height: 32px; border-radius: 9px; cursor: pointer; display: inline-flex;
+            align-items: center; justify-content: center; transition: .15s; flex: 0 0 auto;
+        }
+        .icon-btn:hover { background: var(--surface-hover); color: var(--ink); }
+
+        /* ---------- App shell ---------- */
+        .app { max-width: 1420px; margin: 0 auto; padding: 18px clamp(12px, 3vw, 28px) 90px; animation: fadeIn .6s ease-out; }
+        header.top {
+            display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+            padding: 12px 18px; margin-bottom: 18px;
+            background: var(--glass); border: 1px solid var(--glass-border); border-radius: 16px; backdrop-filter: blur(12px);
+        }
+        .brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
+        .brand .mark { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; background: linear-gradient(135deg, var(--primary), var(--berry)); font-size: 1.3rem; box-shadow: 0 6px 16px rgba(255,122,77,.35); }
+        .brand h1 { font-family: var(--head); font-size: 1.4rem; margin: 0; line-height: 1.05; font-weight: 700; letter-spacing: -.01em; }
+        .brand p { margin: 2px 0 0; font-size: .76rem; color: var(--muted); }
+        .top .backend-chip { margin: 0; }
+        .mesh-stat {
+            display: inline-flex; align-items: center; gap: 8px; font-size: .82rem; font-weight: 600;
+            padding: 7px 14px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line);
+        }
+        .mesh-stat .live { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); position: relative; }
+        .mesh-stat.online .live { background: var(--ok); }
+        .mesh-stat.online .live::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; background: var(--ok); animation: pulse 1.8s ease-out infinite; }
+
+        /* ---------- Layout grid ---------- */
+        .grid { display: grid; grid-template-columns: 340px 1fr 350px; gap: 18px; align-items: start; }
+        .panel { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 18px; padding: 18px; backdrop-filter: blur(12px); margin-bottom: 18px; }
+        .panel:last-child { margin-bottom: 0; }
+        .panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+        .panel-head h2 { font-family: var(--head); font-size: 1.1rem; margin: 0; font-weight: 600; }
+        .panel-head .count { margin-left: auto; font-size: .74rem; color: var(--muted); background: var(--surface-2); padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); }
+        .panel-head .hbtns { margin-left: auto; display: flex; gap: 6px; }
+        .panel-sub { font-size: .8rem; color: var(--muted); margin: -6px 0 14px; line-height: 1.5; }
+
+        /* ---------- Fields ---------- */
+        .field { margin-bottom: 13px; }
+        .field label, .lbl { display: block; font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+        .field input[type=text], .field input[type=number], .field textarea, .field select,
+        .modal input[type=text], .modal input[type=number], .modal textarea, .modal select {
+            width: 100%; padding: 11px 13px; border-radius: 11px; font-size: .92rem; font-family: var(--font);
+            background: linear-gradient(180deg, rgba(15,9,6,.6), rgba(15,9,6,.25)); color: var(--ink); outline: none;
+            border: 1px solid var(--line); box-shadow: inset 0 1px 2px rgba(0,0,0,.3); transition: border-color .15s, box-shadow .15s, background .15s;
+        }
+        .field input::placeholder, .field textarea::placeholder, .modal input::placeholder, .modal textarea::placeholder { color: rgba(194,169,153,.5); }
+        .field textarea, .modal textarea { resize: vertical; min-height: 56px; line-height: 1.5; }
+        .field input:focus, .field textarea:focus, .field select:focus,
+        .modal input:focus, .modal textarea:focus, .modal select:focus {
+            border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255, 122, 77, .18), inset 0 1px 2px rgba(0,0,0,.25);
+        }
+        select { -webkit-appearance: none; appearance: none; cursor: pointer;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23c2a999' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 13px center; padding-right: 32px !important;
+        }
+        select option { background: var(--surface); color: var(--ink); }
+        .field .mono { font-family: var(--mono); letter-spacing: .02em; }
+        .row2 { display: flex; gap: 10px; }
+        .row2 > * { flex: 1; }
+        input[type=checkbox] { -webkit-appearance: none; appearance: none; width: 17px; height: 17px; border-radius: 5px;
+            border: 1px solid var(--line); background: var(--surface); cursor: pointer; position: relative; flex: 0 0 auto; transition: .15s; vertical-align: -3px; }
+        input[type=checkbox]:checked { background: linear-gradient(135deg, var(--primary), var(--amber)); border-color: var(--primary); }
+        input[type=checkbox]:checked::after { content: '✓'; position: absolute; inset: 0; display: grid; place-items: center; font-size: .72rem; color: #2a1206; font-weight: 700; }
+
+        /* ---------- Identity ---------- */
+        .id-card { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 13px; background: var(--surface); border: 1px solid var(--line); margin-bottom: 14px; }
+        .id-ava { width: 48px; height: 48px; border-radius: 13px; display: grid; place-items: center; font-size: 1.5rem; background: linear-gradient(135deg, var(--berry), var(--primary)); flex: 0 0 auto; }
+        .id-meta { min-width: 0; flex: 1; }
+        .id-meta .nm { font-weight: 700; font-size: 1rem; }
+        .id-meta .pid { font-family: var(--mono); font-size: .74rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+        .id-meta .pid b { color: var(--amber); }
+
+        /* ---------- Chips (taste) ---------- */
+        .chip-wrap { display: flex; flex-wrap: wrap; gap: 7px; }
+        .chip {
+            font-size: .8rem; font-weight: 500; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+            background: var(--surface); border: 1px solid var(--line); color: var(--muted); transition: .12s; user-select: none;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
+        .chip:hover { border-color: var(--faint); color: var(--ink); }
+        .chip.love { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+        .chip.avoid { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
+        .chip.on { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
+        .chip .x { opacity: .7; font-size: .7rem; }
+        .chip-hint { font-size: .72rem; color: var(--faint); margin-top: 8px; line-height: 1.5; }
+
+        /* ---------- Rules ---------- */
+        .rule-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; padding-right: 4px; }
+        .rule-item { background: var(--surface); border: 1px solid var(--line); border-radius: 11px; padding: 9px 11px; border-left: 3px solid var(--bad); display: flex; gap: 9px; align-items: flex-start; }
+        .rule-item.conditional { border-left-color: var(--warn); }
+        .rule-item.prefer { border-left-color: var(--ok); }
+        .rule-item .ri-ico { font-size: .95rem; margin-top: 1px; }
+        .rule-item .ri-body { flex: 1; min-width: 0; }
+        .rule-item .ri-t { font-weight: 600; font-size: .85rem; word-break: break-word; }
+        .rule-item .ri-d { font-size: .75rem; color: var(--muted); line-height: 1.4; margin-top: 2px; }
+        .empty { text-align: center; color: var(--faint); font-size: .84rem; padding: 20px 10px; line-height: 1.5; }
+
+        /* ---------- Participants ---------- */
+        .peer-list { display: flex; flex-direction: column; gap: 9px; }
+        .peer-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
+        .peer-card .pdot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); flex: 0 0 auto; }
+        .peer-card .pdot.relayed { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+        .peer-card .pdot.self { background: var(--berry); box-shadow: 0 0 8px var(--berry); }
+        .peer-card .pe { font-size: 1.2rem; }
+        .peer-card .pmeta { min-width: 0; flex: 1; }
+        .peer-card .pmeta .pn { font-weight: 600; font-size: .88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .peer-card .pmeta .pi { font-family: var(--mono); font-size: .7rem; color: var(--faint); }
+        .peer-card .ptag { font-size: .62rem; color: var(--muted); border: 1px solid var(--line); padding: 2px 7px; border-radius: 999px; }
+
+        /* ---------- Concierge ---------- */
+        .concierge-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+        .concierge-actions .btn { flex: 1; min-width: 150px; }
+        .composer {
+            display: flex; align-items: flex-end; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 15px;
+            background: linear-gradient(180deg, rgba(15,9,6,.6), rgba(15,9,6,.25)); border: 1px solid var(--line);
+            box-shadow: inset 0 1px 3px rgba(0,0,0,.35); transition: border-color .15s, box-shadow .15s;
+        }
+        .composer:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255,122,77,.16), inset 0 1px 3px rgba(0,0,0,.3); }
+        .composer textarea {
+            flex: 1; min-height: 24px; max-height: 140px; resize: none; border: none; outline: none; background: transparent;
+            color: var(--ink); font-family: var(--font); font-size: .95rem; line-height: 1.5; padding: 7px 0;
+        }
+        .composer textarea::placeholder { color: rgba(194,169,153,.5); }
+        .composer .send {
+            width: 42px; height: 42px; border-radius: 12px; border: none; cursor: pointer; flex: 0 0 auto;
+            background: linear-gradient(135deg, var(--primary), var(--amber)); color: #2a1206; font-size: 1rem;
+            display: grid; place-items: center; transition: transform .15s, box-shadow .15s; box-shadow: 0 6px 16px rgba(255,122,77,.3);
+        }
+        .composer .send:hover { transform: translateY(-2px) scale(1.03); box-shadow: 0 9px 20px rgba(255,122,77,.4); }
+        .loc-line { font-size: .76rem; color: var(--muted); margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .loc-line a { cursor: pointer; }
+
+        /* ---------- Candidate cards ---------- */
+        .cand-list { display: flex; flex-direction: column; gap: 14px; }
+        .cand { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); overflow: hidden; animation: slideUp .3s ease-out; }
+        .cand.finalized { border-color: var(--ok); box-shadow: 0 0 0 1px var(--ok), 0 12px 30px rgba(87,201,138,.18); }
+        .cand .c-head { padding: 14px 16px 12px; display: flex; gap: 12px; align-items: flex-start; }
+        .cand .c-ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-size: 1.4rem; background: linear-gradient(135deg, var(--amber-soft), var(--primary-soft)); border: 1px solid var(--line); flex: 0 0 auto; }
+        .cand .c-name { font-family: var(--head); font-weight: 600; font-size: 1.12rem; line-height: 1.2; }
+        .cand .c-meta { font-size: .76rem; color: var(--muted); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 5px 12px; }
+        .cand .c-by { font-size: .68rem; color: var(--faint); margin-top: 4px; }
+        .cand .c-pitch { padding: 0 16px 12px; font-size: .9rem; line-height: 1.55; color: var(--ink); }
+        .cand .c-pitch .q { color: var(--amber); font-style: italic; }
+        .cand .stances { padding: 0 16px 12px; display: flex; flex-wrap: wrap; gap: 8px; }
+        .stance {
+            display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px;
+            font-size: .76rem; font-weight: 600; border: 1px solid var(--line); background: var(--bg); position: relative;
+        }
+        .stance .se { font-size: .9rem; }
+        .stance.satisfied { border-color: var(--ok); color: var(--ok); background: var(--ok-soft); }
+        .stance.concern { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); }
+        .stance.veto { border-color: var(--bad); color: var(--bad); background: var(--bad-soft); }
+        .stance.pending { color: var(--faint); }
+        .stance .tip {
+            display: none; position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%);
+            background: var(--surface-2); border: 1px solid var(--glass-border); border-radius: 9px; padding: 7px 10px;
+            font-size: .72rem; font-weight: 400; color: var(--ink); width: max-content; max-width: 220px; line-height: 1.4;
+            z-index: 5; box-shadow: 0 8px 22px rgba(0,0,0,.4); white-space: normal;
+        }
+        .stance:hover .tip { display: block; }
+        .cand .c-foot { padding: 11px 16px; background: var(--surface-2); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .cand .c-foot .grow { flex: 1; }
+        .final-banner { padding: 13px 16px; background: linear-gradient(120deg, var(--ok-soft), transparent); border-top: 1px solid var(--ok); display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--ok); animation: pop .4s ease-out; }
+        .final-banner .fb-emoji { font-size: 1.5rem; }
+
+        /* ---------- Activity feed ---------- */
+        .feed { display: flex; flex-direction: column; gap: 10px; max-height: 460px; overflow-y: auto; padding-right: 4px; }
+        .fe { display: flex; gap: 9px; animation: slideUp .25s ease-out; }
+        .fe .fa-ico { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; font-size: .8rem; flex: 0 0 auto; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+        .fe .fa-body { flex: 1; min-width: 0; font-size: .85rem; line-height: 1.5; }
+        .fe .fa-who { font-weight: 600; font-size: .76rem; color: var(--amber); }
+        .fe .fa-time { font-size: .66rem; color: var(--faint); }
+        .fe.sys .fa-ico { background: var(--primary-soft); color: var(--primary); }
+        .fe.tool .fa-ico { background: var(--amber-soft); color: var(--amber); }
+        .fe.tool .fa-body code { font-family: var(--mono); font-size: .76rem; color: var(--amber); word-break: break-word; }
+        .fe.ask .fa-ico { background: var(--berry-soft); color: var(--berry); }
+        .fe.chat .fa-ico { background: var(--surface-hover); color: var(--ink); }
+        .fe .bubble { background: var(--surface); border: 1px solid var(--line); border-radius: 11px; padding: 8px 11px; margin-top: 3px; }
+
+        /* ---------- Tabs ---------- */
+        .tabs { display: flex; gap: 6px; margin-bottom: 14px; background: var(--surface); padding: 4px; border-radius: 12px; border: 1px solid var(--line); }
+        .tab { flex: 1; text-align: center; padding: 8px; border-radius: 9px; cursor: pointer; font-size: .82rem; font-weight: 600; color: var(--muted); transition: .15s; }
+        .tab:hover { color: var(--ink); }
+        .tab.active { background: var(--surface-2); color: var(--ink); }
+        .tab .badge { font-size: .62rem; background: var(--bad); color: #fff; border-radius: 999px; padding: 1px 6px; margin-left: 4px; }
+
+        /* ---------- Toast ---------- */
+        .toast-wrap { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 3000; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+        .toast { background: var(--surface-2); border: 1px solid var(--glass-border); border-radius: 11px; padding: 10px 16px; font-size: .85rem; box-shadow: 0 12px 30px rgba(0,0,0,.4); animation: slideUp .25s ease-out; max-width: 90vw; }
+        .toast.ok { border-color: var(--ok); }
+        .toast.bad { border-color: var(--bad); }
+
+        /* ---------- Modal ---------- */
+        .modal-overlay { position: fixed; inset: 0; z-index: 1500; display: none; align-items: center; justify-content: center; background: rgba(10, 6, 4, .76); backdrop-filter: blur(8px); padding: 20px; animation: fadeIn .25s; }
+        .modal-overlay.show { display: flex; }
+        .modal { background: var(--surface); border: 1px solid var(--glass-border); border-radius: 18px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; animation: slideUp .3s ease-out; }
+        .modal-head { display: flex; align-items: center; gap: 12px; padding: 18px 20px 0; }
+        .modal-head h2 { font-family: var(--head); margin: 0; font-size: 1.25rem; font-weight: 600; }
+        .modal-head .icon-btn { margin-left: auto; }
+        .modal-body { padding: 16px 20px 20px; }
+        .modal-foot { display: flex; gap: 10px; margin-top: 6px; }
+        .modal-foot .btn { flex: 1; }
+        .seg { display: flex; gap: 8px; }
+        .seg .opt { flex: 1; text-align: center; padding: 9px 8px; border-radius: 10px; cursor: pointer; background: var(--surface-2); border: 1px solid var(--line); font-size: .82rem; font-weight: 600; color: var(--muted); transition: .15s; }
+        .seg .opt.active { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
+
+        .corner-links { position: fixed; bottom: 14px; right: 14px; z-index: 999; display: flex; gap: 8px; font-size: 12.5px; }
+        .corner-links a { background: var(--glass); color: var(--ink); border: 1px solid var(--glass-border); padding: 7px 13px; border-radius: 999px; text-decoration: none; backdrop-filter: blur(8px); transition: .15s; }
+        .corner-links a:hover { border-color: var(--amber); color: var(--amber); }
+
+        @media (max-width: 1180px) { .grid { grid-template-columns: 1fr; } .feed { max-height: 380px; } }
+        @media (max-width: 620px) {
+            .gate h1 { font-size: 2.3rem; }
+            .brand p { display: none; }
+            .app { padding-bottom: 80px; }
+            .concierge-actions .btn { min-width: 120px; }
+            .corner-links { display: none; }
+        }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--surface-hover); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--faint); }
+    </style>
+</head>
+
+<body>
+    <!-- ============ Loader / model gate ============ -->
+    <div id="loader" class="loader-overlay">
+        <div class="gate">
+            <div class="logo">🍽️</div>
+            <div class="kicker">Peer-to-peer dining matchmaker</div>
+            <h1>MatchMeal</h1>
+            <p class="lede">Connect to your friends over a direct WebRTC link. Everyone keeps their taste on their own
+                device, and each person's on-device AI negotiates until the whole table is happy with one restaurant.</p>
+
+            <div id="backend-chip" class="backend-chip"><span class="dot"></span><span id="backend-label">Detecting on-device AI…</span></div>
+
+            <div id="gate-action" style="display:none;">
+                <p id="gate-note" class="gate-note"></p>
+                <button id="enter-btn" class="btn"><i class="fa-solid fa-utensils"></i>&nbsp; Open MatchMeal</button>
+                <p id="gate-sub" class="gate-sub"></p>
+            </div>
+
+            <div id="gate-loading" style="display:none;">
+                <p id="loader-message" class="gate-note">Loading…</p>
+                <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ App ============ -->
+    <div class="app" id="app" style="display:none;">
+        <header class="top">
+            <div class="brand">
+                <div class="mark">🍽️</div>
+                <div>
+                    <h1>MatchMeal</h1>
+                    <p>find a table everyone loves</p>
+                </div>
+            </div>
+            <div id="mesh-stat" class="mesh-stat"><span class="live"></span><span id="mesh-stat-label">Offline</span></div>
+            <div id="top-backend" class="backend-chip"><span class="dot"></span><span id="top-backend-label">—</span></div>
+        </header>
+
+        <div class="grid">
+            <!-- ============ LEFT: identity + connect + taste + rules ============ -->
+            <div>
+                <div class="panel">
+                    <div class="panel-head"><h2>You</h2></div>
+                    <div class="id-card">
+                        <div class="id-ava" id="id-ava">🙂</div>
+                        <div class="id-meta">
+                            <div class="nm" id="id-name">—</div>
+                            <div class="pid">id <b id="id-pid">connecting…</b>
+                                <button class="icon-btn" id="copy-id" title="Copy your id" style="width:24px;height:24px;font-size:.7rem"><i class="fa-solid fa-copy"></i></button>
+                            </div>
+                        </div>
+                        <button class="icon-btn" id="edit-profile" title="Edit name & emoji"><i class="fa-solid fa-pen"></i></button>
+                    </div>
+
+                    <div class="field" style="margin-bottom:8px">
+                        <label>Invite a friend — share your link or id</label>
+                        <div class="row2">
+                            <button class="btn btn-sm btn-block" id="share-btn"><i class="fa-solid fa-link"></i> Copy invite link</button>
+                        </div>
+                    </div>
+                    <div class="field" style="margin-bottom:8px">
+                        <label>Join a friend — paste their id</label>
+                        <div class="row2">
+                            <input type="text" id="join-id" class="mono" placeholder="e.g. meal-AB12CD" />
+                            <button class="btn btn-sm" id="join-btn" style="flex:0 0 auto"><i class="fa-solid fa-plug"></i></button>
+                        </div>
+                    </div>
+                    <label style="display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--muted);cursor:pointer">
+                        <input type="checkbox" id="role-host" checked /> Stay reachable so others can join me (host)
+                    </label>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2>Your taste</h2>
+                        <div class="hbtns">
+                            <button class="icon-btn" id="export-btn" title="Export preferences"><i class="fa-solid fa-file-export"></i></button>
+                            <button class="icon-btn" id="import-btn" title="Import preferences"><i class="fa-solid fa-file-import"></i></button>
+                        </div>
+                    </div>
+                    <p class="panel-sub">Tap a cuisine once for <b style="color:var(--ok)">love</b>, twice to <b style="color:var(--bad)">avoid</b>, again to clear. Stored only on your device.</p>
+                    <div class="chip-wrap" id="cuisine-chips"></div>
+                    <button class="btn btn-sm btn-ghost" id="add-cuisine" style="margin-top:10px"><i class="fa-solid fa-plus"></i> Add cuisine</button>
+
+                    <label class="lbl" style="margin-top:16px">Dietary needs</label>
+                    <div class="chip-wrap" id="diet-chips"></div>
+
+                    <div class="row2" style="margin-top:14px">
+                        <div class="field" style="margin-bottom:0">
+                            <label>Budget (max)</label>
+                            <select id="budget">
+                                <option value="$">$ — cheap eats</option>
+                                <option value="$$" selected>$$ — moderate</option>
+                                <option value="$$$">$$$ — pricey</option>
+                                <option value="$$$$">$$$$ — splurge</option>
+                            </select>
+                        </div>
+                        <div class="field" style="margin-bottom:0">
+                            <label>Max distance</label>
+                            <select id="radius">
+                                <option value="800">Walk · 800 m</option>
+                                <option value="1500" selected>Near · 1.5 km</option>
+                                <option value="4000">Drive · 4 km</option>
+                                <option value="10000">Far · 10 km</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="field" style="margin-top:12px;margin-bottom:0">
+                        <label>Anything else your AI should know</label>
+                        <textarea id="notes" placeholder="e.g. I love patios, hate loud places, and I'm trying to eat less red meat."></textarea>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2>Avoid & conditions</h2>
+                        <span class="count" id="rule-count">0</span>
+                    </div>
+                    <p class="panel-sub">Places to never suggest, or to allow only under a condition. Your AI checks these before agreeing to anything.</p>
+                    <div class="rule-list" id="rule-list"></div>
+                    <button class="btn btn-sm btn-ghost btn-block" id="add-rule" style="margin-top:12px"><i class="fa-solid fa-ban"></i> Add a rule</button>
+                </div>
+            </div>
+
+            <!-- ============ CENTER: concierge + candidates ============ -->
+            <div>
+                <div class="panel">
+                    <div class="panel-head"><h2>Your concierge</h2></div>
+                    <p class="panel-sub">Tell your on-device AI what you fancy, or just let it search nearby. It uses your location to find real restaurants, then proposes them to everyone connected.</p>
+                    <div class="concierge-actions">
+                        <button class="btn" id="ask-table-btn"><i class="fa-solid fa-people-group"></i> Ask the table</button>
+                        <button class="btn" id="find-btn"><i class="fa-solid fa-magnifying-glass-location"></i> Find a place</button>
+                    </div>
+                    <div class="composer">
+                        <textarea id="concierge-input" rows="1" placeholder="Tell your concierge… e.g. somewhere cozy for ramen, not too pricey"></textarea>
+                        <button class="send" id="concierge-send" title="Send (Enter)"><i class="fa-solid fa-paper-plane"></i></button>
+                    </div>
+                    <div class="loc-line" id="loc-line">
+                        <i class="fa-solid fa-location-dot"></i>
+                        <span id="loc-label">Location not set</span>
+                        <a id="loc-set">use my location</a> ·
+                        <a id="loc-manual">enter manually</a>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2>On the table</h2>
+                        <span class="count" id="cand-count">no options yet</span>
+                    </div>
+                    <div class="cand-list" id="cand-list">
+                        <div class="empty">No options yet. Hit <b>Find a place</b> to search nearby, or tell your concierge what you're craving. Proposals you and your friends make show up here, with everyone's verdict.</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ RIGHT: participants + feed ============ -->
+            <div>
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2>The table</h2>
+                        <span class="count" id="peer-count">just you</span>
+                    </div>
+                    <div class="peer-list" id="peer-list"></div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-head">
+                        <h2 id="feed-title">Activity</h2>
+                        <button class="icon-btn" id="clear-feed" title="Clear" style="margin-left:auto"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <div class="feed" id="feed">
+                        <div class="empty">Your concierge's searches, the agents' negotiation, and table chat all appear here.</div>
+                    </div>
+                    <div class="composer" style="margin-top:12px">
+                        <textarea id="chat-input" rows="1" placeholder="Say something to the table…"></textarea>
+                        <button class="send" id="chat-send" title="Send to everyone"><i class="fa-solid fa-comment"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ Profile modal ============ -->
+    <div class="modal-overlay" id="profile-modal">
+        <div class="modal">
+            <div class="modal-head"><h2>Your profile</h2><button class="icon-btn" data-close="profile-modal"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="modal-body">
+                <div class="field"><label>Display name</label><input type="text" id="pf-name" placeholder="e.g. Mia" /></div>
+                <div class="field"><label>Avatar emoji</label><input type="text" id="pf-emoji" maxlength="4" placeholder="🙂" /></div>
+                <div class="modal-foot">
+                    <button class="btn btn-ghost" data-close="profile-modal">Cancel</button>
+                    <button class="btn" id="pf-save"><i class="fa-solid fa-check"></i> Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ Rule modal ============ -->
+    <div class="modal-overlay" id="rule-modal">
+        <div class="modal">
+            <div class="modal-head"><h2 id="rule-modal-title">Add a rule</h2><button class="icon-btn" data-close="rule-modal"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="modal-body">
+                <div class="field"><label>What should this rule apply to?</label><input type="text" id="rule-target" placeholder="e.g. Joe's Diner — or a cuisine like sushi" /></div>
+                <div class="field">
+                    <label>This is a…</label>
+                    <div class="seg" id="rule-scope-seg">
+                        <div class="opt active" data-scope="restaurant">Specific place</div>
+                        <div class="opt" data-scope="cuisine">A cuisine</div>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Rule</label>
+                    <div class="seg" id="rule-mode-seg">
+                        <div class="opt active" data-mode="never">Never suggest</div>
+                        <div class="opt" data-mode="conditional">Only if…</div>
+                    </div>
+                </div>
+                <div class="field" id="rule-cond-field" style="display:none">
+                    <label>…only acceptable when</label>
+                    <input type="text" id="rule-condition" placeholder="e.g. it's a special occasion / it's raining / they have a patio" />
+                </div>
+                <div class="field"><label>Note to your AI (optional)</label><input type="text" id="rule-note" placeholder="e.g. terrible service last time" /></div>
+                <div class="modal-foot">
+                    <button class="btn btn-ghost" data-close="rule-modal">Cancel</button>
+                    <button class="btn" id="rule-save"><i class="fa-solid fa-check"></i> Save rule</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ Add cuisine modal ============ -->
+    <div class="modal-overlay" id="cuisine-modal">
+        <div class="modal">
+            <div class="modal-head"><h2>Add a cuisine</h2><button class="icon-btn" data-close="cuisine-modal"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="modal-body">
+                <div class="field"><label>Cuisine or food type</label><input type="text" id="cuisine-new" placeholder="e.g. ethiopian, ramen, tapas" /></div>
+                <div class="modal-foot">
+                    <button class="btn btn-ghost" data-close="cuisine-modal">Cancel</button>
+                    <button class="btn" id="cuisine-add-save"><i class="fa-solid fa-check"></i> Add</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ Manual location modal ============ -->
+    <div class="modal-overlay" id="loc-modal">
+        <div class="modal">
+            <div class="modal-head"><h2>Set location</h2><button class="icon-btn" data-close="loc-modal"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="modal-body">
+                <p class="panel-sub">Type a place name to look up, or paste exact coordinates.</p>
+                <div class="field"><label>Place / address</label>
+                    <div class="row2">
+                        <input type="text" id="loc-query" placeholder="e.g. Shibuya, Tokyo" />
+                        <button class="btn btn-sm" id="loc-lookup" style="flex:0 0 auto"><i class="fa-solid fa-magnifying-glass"></i></button>
+                    </div>
+                </div>
+                <div class="row2">
+                    <div class="field"><label>Latitude</label><input type="number" id="loc-lat" step="any" placeholder="35.659" /></div>
+                    <div class="field"><label>Longitude</label><input type="number" id="loc-lon" step="any" placeholder="139.700" /></div>
+                </div>
+                <div class="modal-foot">
+                    <button class="btn btn-ghost" data-close="loc-modal">Cancel</button>
+                    <button class="btn" id="loc-save"><i class="fa-solid fa-check"></i> Use this</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ Store-opinion modal (after a veto/concern) ============ -->
+    <div class="modal-overlay" id="opinion-modal">
+        <div class="modal">
+            <div class="modal-head"><h2>Remember this for next time?</h2><button class="icon-btn" data-close="opinion-modal"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="modal-body">
+                <p class="panel-sub" id="opinion-ctx"></p>
+                <div class="field">
+                    <label>How should your AI treat it in future?</label>
+                    <div class="seg" id="opinion-seg" style="flex-wrap:wrap">
+                        <div class="opt active" data-op="never">Never again</div>
+                        <div class="opt" data-op="conditional">Only if…</div>
+                        <div class="opt" data-op="cuisine">Avoid this cuisine</div>
+                    </div>
+                </div>
+                <div class="field" id="opinion-cond-field" style="display:none">
+                    <label>…only acceptable when</label>
+                    <input type="text" id="opinion-condition" placeholder="e.g. nowhere else is open" />
+                </div>
+                <div class="field"><label>Why (optional)</label><input type="text" id="opinion-note" placeholder="e.g. too loud, slow service" /></div>
+                <div class="modal-foot">
+                    <button class="btn btn-ghost" data-close="opinion-modal">Skip</button>
+                    <button class="btn" id="opinion-save"><i class="fa-solid fa-check"></i> Save preference</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ Import modal ============ -->
+    <div class="modal-overlay" id="import-modal">
+        <div class="modal">
+            <div class="modal-head"><h2>Import preferences</h2><button class="icon-btn" data-close="import-modal"><i class="fa-solid fa-xmark"></i></button></div>
+            <div class="modal-body">
+                <p class="panel-sub">Pick a previously exported <span class="mono">.matchmeal.json</span> file, or paste its contents below.</p>
+                <div class="field"><button class="btn btn-ghost btn-block" id="import-file-btn"><i class="fa-solid fa-folder-open"></i> Choose file…</button><input type="file" id="import-file" accept=".json,application/json" style="display:none" /></div>
+                <div class="field"><label>…or paste JSON</label><textarea id="import-text" style="min-height:120px" placeholder='{"profile":{...},"rules":[...]}'></textarea></div>
+                <div class="modal-foot">
+                    <button class="btn btn-ghost" data-close="import-modal">Cancel</button>
+                    <button class="btn" id="import-apply"><i class="fa-solid fa-check"></i> Import</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="hidden-import" accept=".json,application/json" style="display:none" />
+    <div class="toast-wrap" id="toast-wrap"></div>
+    <div class="corner-links">
+        <a id="reset-link" title="Forget everything on this device">↺ Reset</a>
+        <a href="https://github.com/woodyhoko/ai-mesh" target="_blank" rel="noopener">➤ Inspired by ai-mesh</a>
+        <a title="Copyright (c) 2026 woodyhoko. All Rights Reserved." style="cursor:default">© 2026 woodyhoko</a>
+    </div>
+
+    <script type="module">
+        /* The MediaPipe GenAI runtime (~heavy) is only needed for the on-device
+           Gemma fallback, so it's dynamically imported inside loadGemma() — the
+           page itself loads instantly and Chrome built-in AI users never fetch it. */
+
+        /* ======================================================================
+           AI BACKEND — Chrome built-in Prompt API, with on-device Gemma fallback.
+           (Same approach as the ai-mesh project: zero-download Prompt API when the
+           browser has it, otherwise Gemma via LiteRT/WebGPU, weights cached in OPFS.)
+           ====================================================================== */
+        const MODEL_URL = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.task";
+        const MODEL_FILENAME = "gemma-4-E2B-it-web.task";
+
+        const AI = {
+            backend: null, gemmaLlm: null, ready: false,
+            async detect() {
+                if (typeof window.LanguageModel !== 'undefined') {
+                    try {
+                        const avail = await window.LanguageModel.availability();
+                        if (avail && avail !== 'unavailable') { this.backend = 'chrome'; return 'chrome'; }
+                    } catch (_) { }
+                }
+                this.backend = 'gemma'; return 'gemma';
+            },
+            async run(prompt, { schema = null } = {}) {
+                if (this.backend === 'chrome') {
+                    const session = await window.LanguageModel.create();
+                    try {
+                        const opts = schema ? { responseConstraint: schema } : {};
+                        return await session.prompt(prompt, opts);
+                    } finally { session.destroy(); }
+                }
+                const wrapped = `<start_of_turn>user\n${prompt}\n<end_of_turn>\n<start_of_turn>model\n`;
+                const out = await this.gemmaLlm.generateResponse(wrapped);
+                return (out || '').trim();
+            },
+            // Best-effort JSON call with a deterministic fallback so the app never hard-fails.
+            async json(prompt, schema, fallback) {
+                try {
+                    const raw = await this.run(prompt, { schema });
+                    return JSON.parse(extractJson(raw));
+                } catch (e) { console.warn('AI.json failed, using fallback', e); return fallback; }
+            }
+        };
+
+        // Pull the FIRST balanced {...} object out of a model response — robust to
+        // chatty models that wrap JSON in prose or emit more than one object.
+        function extractJson(text) {
+            if (!text) return '{}';
+            const start = text.indexOf('{');
+            if (start === -1) return text;
+            let depth = 0, inStr = false, esc = false;
+            for (let i = start; i < text.length; i++) {
+                const ch = text[i];
+                if (inStr) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') inStr = false; }
+                else if (ch === '"') inStr = true;
+                else if (ch === '{') depth++;
+                else if (ch === '}') { if (--depth === 0) return text.slice(start, i + 1); }
+            }
+            return text.slice(start);
+        }
+
+        function setProgress(pct) { const f = $('progress-fill'); if (f) f.style.width = pct + '%'; }
+
+        async function loadGemma() {
+            const msg = $('loader-message');
+            if (window.location.protocol === 'file:') {
+                alert("Local security restriction:\n\nGemma uses WebGPU/OPFS features browsers block on 'file://'.\nServe over http, e.g.  python -m http.server  then open http://localhost:8000");
+            }
+            const ua = navigator.userAgent;
+            if (!ua.includes('Chrome') && !ua.includes('Edg')) {
+                alert('On-device Gemma needs Chrome or Edge (WebGPU). Other browsers can still connect and use a profile, but the AI features need a supported browser.');
+            }
+            msg.textContent = "Fetching Gemma weights (cached after first download)…";
+            const { stream, size } = await loadModelWithOpfsCache(MODEL_URL, MODEL_FILENAME);
+            const tracked = streamWithProgress(stream, size, (prog, dl, total) => {
+                setProgress(Math.round(prog * 0.9));
+                const mb = b => (b / 1048576).toFixed(0);
+                msg.innerHTML = total
+                    ? `Downloading Gemma… ${prog}% (${mb(dl)} / ${mb(total)} MB)<br><span style="font-size:.8em;opacity:.6">Cached for next time</span>`
+                    : `Downloading Gemma… ${mb(dl)} MB`;
+            });
+            msg.textContent = "Warming up WebGPU & compiling the model…";
+            setProgress(95);
+            const { FilesetResolver, LlmInference } = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai/+esm');
+            const fileset = await FilesetResolver.forGenAiTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai/wasm');
+            AI.gemmaLlm = await LlmInference.createFromOptions(fileset, {
+                baseOptions: { modelAssetBuffer: tracked.getReader() }, maxTokens: 1024, topK: 16, temperature: 0.7
+            });
+            setProgress(100);
+        }
+        function streamWithProgress(inputStream, contentLength, onProgress) {
+            let downloaded = 0;
+            return inputStream.pipeThrough(new TransformStream({
+                transform: (chunk, controller) => {
+                    downloaded += chunk.byteLength;
+                    const prog = contentLength > 0 ? Math.min(100, Math.round(downloaded / contentLength * 100)) : 0;
+                    try { onProgress && onProgress(prog, downloaded, contentLength); } catch (_) { }
+                    controller.enqueue(chunk);
+                }
+            }));
+        }
+        async function loadModelWithOpfsCache(modelUrl, fileName) {
+            try {
+                const opfsRoot = await navigator.storage.getDirectory();
+                try {
+                    const fh = await opfsRoot.getFileHandle(fileName);
+                    const file = await fh.getFile();
+                    const sh = await opfsRoot.getFileHandle(fileName + "_size");
+                    const expected = parseInt(await (await sh.getFile()).text(), 10);
+                    if (Number.isFinite(expected) && file.size === expected) return { stream: file.stream(), size: file.size };
+                    await opfsRoot.removeEntry(fileName).catch(() => { });
+                    await opfsRoot.removeEntry(fileName + "_size").catch(() => { });
+                } catch (e) { if (e && e.name !== "NotFoundError") console.warn("OPFS read error:", e); }
+                let expectedSize = 0;
+                try { const head = await fetch(modelUrl, { method: "HEAD" }); if (head.ok) expectedSize = Number(head.headers.get("Content-Length") || 0); } catch (_) { }
+                const response = await fetch(modelUrl);
+                if (!response.ok || !response.body) throw new Error(`Failed to fetch Gemma weights: ${response.status}`);
+                const [consumer, cache] = response.body.tee();
+                (async () => {
+                    try {
+                        const fh = await opfsRoot.getFileHandle(fileName, { create: true });
+                        const w = await fh.createWritable();
+                        const sh = await opfsRoot.getFileHandle(fileName + "_size", { create: true });
+                        const sw = await sh.createWritable();
+                        await sw.write(new TextEncoder().encode(String(expectedSize))); await sw.close();
+                        await cache.pipeTo(w);
+                    } catch (err) {
+                        await opfsRoot.removeEntry(fileName).catch(() => { });
+                        await opfsRoot.removeEntry(fileName + "_size").catch(() => { });
+                    }
+                })();
+                return { stream: consumer, size: expectedSize };
+            } catch (err) {
+                console.warn("OPFS unavailable, direct fetch:", err);
+                const response = await fetch(modelUrl);
+                if (!response.ok || !response.body) throw new Error(`Failed to fetch Gemma weights: ${response.status}`);
+                return { stream: response.body, size: Number(response.headers.get("Content-Length") || 0) };
+            }
+        }
+
+        /* ======================================================================
+           STATE — profile, rules, location all persist in localStorage so nobody
+           ever has to re-enter anything.
+           ====================================================================== */
+        const uid = () => Math.random().toString(36).slice(2, 10);
+        const now = () => Date.now();
+        const $ = id => document.getElementById(id);
+        const esc = s => (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const ago = ts => { const s = Math.floor((now() - ts) / 1000); return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m` : `${Math.floor(s / 3600)}h`; };
+
+        const DEFAULT_CUISINES = ['italian', 'japanese', 'chinese', 'thai', 'indian', 'mexican', 'korean', 'vietnamese', 'american', 'mediterranean', 'french', 'pizza', 'burgers', 'sushi', 'bbq', 'seafood', 'ramen', 'tapas', 'vegan', 'dessert'];
+        const DIET_TAGS = ['vegetarian', 'vegan', 'halal', 'kosher', 'gluten-free', 'nut-free', 'dairy-free', 'pescatarian', 'no pork', 'no beef'];
+        const BUDGET_ORDER = ['$', '$$', '$$$', '$$$$'];
+
+        const State = {
+            profile: {
+                name: '', emoji: '🙂',
+                cuisines: {},      // { italian: 'love' | 'avoid' }
+                extraCuisines: [], // user-added cuisine names
+                diet: [],          // selected diet tags
+                budget: '$$',
+                notes: ''
+            },
+            radius: 1500,
+            rules: [],             // { id, scope:'restaurant'|'cuisine', target, mode:'never'|'conditional', condition, note }
+            location: null,        // { lat, lon, label, ts }
+            isHost: true,
+            // ---- runtime session (not persisted) ----
+            proposals: [],         // shared negotiation board
+            peerMoods: {},         // peerId -> mood text
+            vetoedNames: new Set(),
+
+            load() {
+                try {
+                    const p = JSON.parse(localStorage.getItem('mm_profile') || 'null'); if (p) this.profile = { ...this.profile, ...p };
+                    const r = JSON.parse(localStorage.getItem('mm_rules') || 'null'); if (Array.isArray(r)) this.rules = r;
+                    const l = JSON.parse(localStorage.getItem('mm_location') || 'null'); if (l) this.location = l;
+                    const rad = parseInt(localStorage.getItem('mm_radius') || '0', 10); if (rad) this.radius = rad;
+                    const h = localStorage.getItem('mm_host'); if (h !== null) this.isHost = h === '1';
+                } catch (_) { }
+                if (!this.profile.name) this.profile.name = randomName();
+            },
+            save() {
+                localStorage.setItem('mm_profile', JSON.stringify(this.profile));
+                localStorage.setItem('mm_rules', JSON.stringify(this.rules));
+                if (this.location) localStorage.setItem('mm_location', JSON.stringify(this.location));
+                localStorage.setItem('mm_radius', String(this.radius));
+                localStorage.setItem('mm_host', this.isHost ? '1' : '0');
+            },
+            // The portable preference bundle for import/export.
+            exportBundle() {
+                return { app: 'matchmeal', version: 1, exportedAt: new Date().toISOString(), profile: this.profile, rules: this.rules, radius: this.radius, location: this.location };
+            },
+            importBundle(b) {
+                if (!b || typeof b !== 'object') throw new Error('not a MatchMeal file');
+                if (b.profile) this.profile = { ...this.profile, ...b.profile };
+                if (Array.isArray(b.rules)) this.rules = b.rules;
+                if (b.radius) this.radius = b.radius;
+                if (b.location) this.location = b.location;
+                this.save();
+            }
+        };
+
+        function randomName() {
+            const a = ['Hungry', 'Peckish', 'Famished', 'Snackish', 'Ravenous', 'Curious', 'Choosy', 'Easygoing'];
+            const b = ['Otter', 'Panda', 'Fox', 'Heron', 'Tapir', 'Cardamom', 'Basil', 'Miso'];
+            return `${a[Math.floor(Math.random() * a.length)]} ${b[Math.floor(Math.random() * b.length)]}`;
+        }
+
+        // Build a compact, human-readable description of my tastes for the LLM.
+        function myTasteSummary(extra = '') {
+            const p = State.profile;
+            const loves = Object.keys(p.cuisines).filter(c => p.cuisines[c] === 'love');
+            const avoids = Object.keys(p.cuisines).filter(c => p.cuisines[c] === 'avoid');
+            const lines = [];
+            if (loves.length) lines.push(`Loves: ${loves.join(', ')}.`);
+            if (avoids.length) lines.push(`Dislikes: ${avoids.join(', ')}.`);
+            if (p.diet.length) lines.push(`Dietary needs: ${p.diet.join(', ')}.`);
+            lines.push(`Budget up to ${p.budget}.`);
+            if (p.notes) lines.push(`Notes: ${p.notes}`);
+            const neverRules = State.rules.filter(r => r.mode === 'never').map(r => `${r.target}${r.note ? ' (' + r.note + ')' : ''}`);
+            const condRules = State.rules.filter(r => r.mode === 'conditional').map(r => `${r.target} only if ${r.condition}`);
+            if (neverRules.length) lines.push(`Never suggest: ${neverRules.join('; ')}.`);
+            if (condRules.length) lines.push(`Conditional: ${condRules.join('; ')}.`);
+            if (extra) lines.push(`Right now: ${extra}`);
+            return lines.join(' ');
+        }
+
+        /* ======================================================================
+           WEB SEARCH — real nearby restaurants from OpenStreetMap (Overpass API).
+           Keyless, CORS-enabled. This is the "tool" the concierge calls.
+           ====================================================================== */
+        function haversine(lat1, lon1, lat2, lon2) {
+            const R = 6371000, toRad = d => d * Math.PI / 180;
+            const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+            const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+            return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+        }
+        const OVERPASS = [
+            'https://overpass-api.de/api/interpreter',
+            'https://overpass.kumi.systems/api/interpreter',
+            'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+        ];
+        async function searchRestaurants(lat, lon, radius = 1500, max = 60) {
+            const q = `[out:json][timeout:25];(node["amenity"~"^(restaurant|cafe|fast_food)$"](around:${radius},${lat},${lon}););out body ${max};`;
+            for (const ep of OVERPASS) {
+                try {
+                    const res = await fetch(ep, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+                    if (!res.ok) continue;
+                    const json = await res.json();
+                    const out = (json.elements || []).filter(e => e.tags && e.tags.name).map(e => {
+                        const t = e.tags;
+                        return {
+                            name: t.name,
+                            cuisine: (t.cuisine || '').replace(/[_;]/g, ' ').replace(/\s+/g, ' ').trim(),
+                            kind: t.amenity,
+                            lat: e.lat, lon: e.lon,
+                            dist: haversine(lat, lon, e.lat, e.lon),
+                            address: [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' '),
+                            veg: t['diet:vegetarian'] === 'yes' || t['diet:vegetarian'] === 'only',
+                            vegan: t['diet:vegan'] === 'yes' || t['diet:vegan'] === 'only',
+                            halal: t['diet:halal'] === 'yes' || t['diet:halal'] === 'only'
+                        };
+                    });
+                    out.sort((a, b) => a.dist - b.dist);
+                    return out;
+                } catch (e) { console.warn('overpass endpoint failed', ep, e); }
+            }
+            throw new Error('All restaurant search endpoints failed.');
+        }
+        // Forward geocode a place name (manual location lookup).
+        async function geocode(query) {
+            const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+            const j = await res.json();
+            if (!j.length) throw new Error('Place not found');
+            return { lat: parseFloat(j[0].lat), lon: parseFloat(j[0].lon), label: j[0].display_name.split(',').slice(0, 2).join(', ') };
+        }
+        async function reverseGeocode(lat, lon) {
+            try {
+                const url = `https://nominatim.openstreetmap.org/reverse?format=json&zoom=14&lat=${lat}&lon=${lon}`;
+                const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
+                const j = await r.json();
+                const a = j.address || {};
+                return a.suburb || a.neighbourhood || a.city || a.town || a.village || a.county || `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+            } catch (_) { return `${lat.toFixed(3)}, ${lon.toFixed(3)}`; }
+        }
+
+        function ensureLocation() {
+            return new Promise((resolve) => {
+                if (State.location) return resolve(State.location);
+                if (!navigator.geolocation) { toast('Geolocation unavailable — set a location manually.', 'bad'); openModal('loc-modal'); return resolve(null); }
+                toast('Asking your browser for your location…');
+                navigator.geolocation.getCurrentPosition(async pos => {
+                    const lat = pos.coords.latitude, lon = pos.coords.longitude;
+                    const label = await reverseGeocode(lat, lon);
+                    State.location = { lat, lon, label, ts: now() }; State.save(); renderLocation();
+                    resolve(State.location);
+                }, err => {
+                    console.warn(err); toast('Could not get location — enter it manually.', 'bad'); openModal('loc-modal'); resolve(null);
+                }, { timeout: 10000, maximumAge: 600000 });
+            });
+        }
+
+        /* ======================================================================
+           THE MESH — real WebRTC data channels via PeerJS (same plumbing as
+           ai-mesh). Hosts stay on the broker so friends can dial in; everyone
+           gossips their peer list so 3+ people form a full mesh.
+           ====================================================================== */
+        const Mesh = {
+            peer: null, myId: null, online: false,
+            conns: new Map(),   // peerId -> { conn, name, emoji, relayed }
+            seen: new Set(), seenOrder: [],
+
+            async start() {
+                const shortId = 'meal-' + Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+                return new Promise((resolve) => {
+                    this.peer = new Peer(shortId, { debug: 1 });
+                    this.peer.on('open', id => { this.myId = id; this.online = true; resolve(id); });
+                    this.peer.on('connection', conn => this._wire(conn, false));
+                    this.peer.on('error', err => {
+                        console.warn('Peer error:', err.type, err);
+                        if (err.type === 'unavailable-id') { this.peer.destroy(); this.start().then(resolve); }
+                        else if (err.type === 'peer-unavailable') toast('That friend is offline or the id is wrong.', 'bad');
+                        else if (!this.myId) { this.myId = shortId; resolve(shortId); toast('Signalling broker unreachable — running solo.', 'bad'); }
+                    });
+                    this.peer.on('disconnected', () => { if (State.isHost) { try { this.peer.reconnect(); } catch (_) { } } });
+                });
+            },
+            seenAdd(id) { this.seen.add(id); this.seenOrder.push(id); if (this.seenOrder.length > 600) this.seen.delete(this.seenOrder.shift()); },
+
+            connectTo(peerId, relayed = false) {
+                peerId = (peerId || '').trim();
+                if (!peerId || peerId === this.myId || this.conns.has(peerId)) return;
+                const conn = this.peer.connect(peerId, { reliable: true });
+                this._wire(conn, relayed);
+            },
+            _wire(conn, relayed) {
+                conn.on('open', () => {
+                    this.conns.set(conn.peer, { conn, name: conn.peer, emoji: '🙂', relayed });
+                    this._send(conn, this._envelope('HELLO', { name: State.profile.name, emoji: State.profile.emoji, peers: [...this.conns.keys()].filter(p => p !== conn.peer) }));
+                    // Re-share any proposals already on my board so late joiners see the full table.
+                    State.proposals.forEach(p => this._send(conn, this._envelope('PROPOSE', { proposal: serializeProposal(p) })));
+                    renderPeers(); updateMeshStat();
+                    feedSys(`<b>${esc(this.conns.get(conn.peer).name)}</b> joined the table.`);
+                });
+                conn.on('data', raw => this._onMessage(conn, raw));
+                conn.on('close', () => { this.conns.delete(conn.peer); renderPeers(); updateMeshStat(); renderProposals(); });
+                conn.on('error', e => console.warn('conn error', conn.peer, e));
+            },
+            _envelope(type, payload, ttl = 4) { return { v: 1, id: uid(), type, from: this.myId, fromName: State.profile.name, fromEmoji: State.profile.emoji, ttl, ts: now(), payload }; },
+            _send(conn, env) { try { conn.send(env); } catch (e) { console.warn('send fail', e); } },
+            broadcast(env, exceptPeer = null) { for (const [pid, info] of this.conns) { if (pid !== exceptPeer) this._send(info.conn, env); } },
+            emit(type, payload) { const env = this._envelope(type, payload); this.seenAdd(env.id); this.broadcast(env); return env; },
+
+            _onMessage(conn, env) {
+                if (!env || typeof env !== 'object' || !env.id) return;
+                if (this.seen.has(env.id)) return;
+                this.seenAdd(env.id);
+
+                if (env.type === 'HELLO') {
+                    const info = this.conns.get(conn.peer);
+                    if (info) { info.name = env.payload.name || conn.peer; info.emoji = env.payload.emoji || '🙂'; }
+                    (env.payload.peers || []).forEach(pid => { if (pid !== this.myId && !this.conns.has(pid)) this.connectTo(pid, true); });
+                    renderPeers(); renderProposals();
+                    return;
+                }
+                // Everything below is gossip — handle locally, then keep flooding the mesh.
+                handleMeshEvent(env);
+                if (env.ttl > 1 && env.type !== 'HELLO') this.broadcast({ ...env, ttl: env.ttl - 1 }, conn.peer);
+            }
+        };
+
+        function updateMeshStat() {
+            const stat = $('mesh-stat'), lbl = $('mesh-stat-label');
+            const n = Mesh.conns.size;
+            if (Mesh.online && n > 0) { stat.className = 'mesh-stat online'; lbl.textContent = `${n} connected${State.isHost ? ' · host' : ''}`; }
+            else if (Mesh.online) { stat.className = 'mesh-stat online'; lbl.textContent = State.isHost ? 'Hosting — share your link' : 'Online — solo'; }
+            else { stat.className = 'mesh-stat'; lbl.textContent = 'Offline'; }
+        }
+
+        /* ======================================================================
+           NEGOTIATION PROTOCOL
+           PROPOSE  — someone's concierge puts a restaurant on the table
+           VERDICT  — an agent's stance on a proposal (on its owner's behalf)
+           ASK      — an agent asks the table a question (mood / concerns)
+           ANSWER   — an agent answers on its owner's behalf
+           FINALIZE — the proposer locks in a place everyone's happy with
+           CHAT     — a plain human message to the whole table
+           ====================================================================== */
+        function serializeProposal(p) { return { id: p.id, name: p.name, cuisine: p.cuisine, dist: p.dist, address: p.address, lat: p.lat, lon: p.lon, pitch: p.pitch, by: p.by, byName: p.byName }; }
+        function findProposal(id) { return State.proposals.find(p => p.id === id); }
+
+        function handleMeshEvent(env) {
+            const p = env.payload || {};
+            if (env.type === 'PROPOSE') return onProposal(p.proposal, env);
+            if (env.type === 'VERDICT') return onVerdict(p, env);
+            if (env.type === 'FINALIZE') return onFinalize(p, env);
+            if (env.type === 'ASK') return onAsk(p, env);
+            if (env.type === 'ANSWER') return onAnswer(p, env);
+            if (env.type === 'CHAT') return feedChat(env.fromName, env.fromEmoji, p.text);
+        }
+
+        // A proposal arrived from a peer — add it, then let MY agent judge it on my behalf.
+        async function onProposal(prop, env) {
+            if (!prop || findProposal(prop.id)) return;
+            const proposal = { ...prop, verdicts: {}, finalized: false };
+            State.proposals.unshift(proposal);
+            renderProposals();
+            feedAsk(env.fromName, env.fromEmoji, `proposes <b>${esc(prop.name)}</b> — my agent is checking it against your tastes…`);
+            const v = await evaluateProposal(proposal);
+            setMyVerdict(proposal, v, /*broadcast*/true);
+        }
+
+        function onVerdict(p, env) {
+            const proposal = findProposal(p.proposalId); if (!proposal) return;
+            proposal.verdicts[env.from] = { stance: p.stance, reason: p.reason, name: env.fromName, emoji: env.fromEmoji };
+            renderProposals();
+        }
+        function onFinalize(p, env) {
+            const proposal = findProposal(p.proposalId); if (!proposal) return;
+            proposal.finalized = true; State.proposals.forEach(x => { if (x.id !== proposal.id) x.finalized = false; });
+            renderProposals();
+            feedSys(`🎉 <b>${esc(env.fromName)}</b> locked in <b>${esc(proposal.name)}</b>. Bon appétit!`);
+            toast(`It's settled: ${proposal.name} 🎉`, 'ok');
+        }
+        async function onAsk(p, env) {
+            feedAsk(env.fromName, env.fromEmoji, esc(p.question));
+            // My agent answers on my behalf, drawing only on my on-device profile.
+            const answer = await answerQuestion(p.topic, p.question, p.context);
+            Mesh.emit('ANSWER', { topic: p.topic, askId: p.askId, text: answer });
+            feedAnswer(State.profile.name, State.profile.emoji, answer, true);
+        }
+        function onAnswer(p, env) {
+            if (p.topic === 'mood') State.peerMoods[env.from] = `${env.fromName}: ${p.text}`;
+            feedAnswer(env.fromName, env.fromEmoji, p.text, false);
+        }
+
+        /* ======================================================================
+           THE CONCIERGE AGENT — searches, proposes, evaluates, and speaks for you.
+           ====================================================================== */
+
+        // Decide search parameters from the combined table preferences. (function-call #1)
+        async function planSearch(extraIntent) {
+            const moods = Object.values(State.peerMoods).join(' | ');
+            const schema = { type: 'object', properties: { cuisines: { type: 'array', items: { type: 'string' } }, vibe: { type: 'string' } }, required: ['cuisines'] };
+            const loves = Object.keys(State.profile.cuisines).filter(c => State.profile.cuisines[c] === 'love');
+            const prompt = `You are a dining concierge planning a restaurant search for a group.
+MY OWNER: ${myTasteSummary(extraIntent)}
+OTHERS AT THE TABLE: ${moods || '(no input yet)'}
+
+Pick 1-4 cuisine/food keywords (lowercase, single words like "ramen", "italian", "vegan") that best satisfy the WHOLE group, balancing everyone. Avoid anyone's disliked cuisines.
+Respond ONLY as JSON: {"cuisines":["..."],"vibe":"a few words on the mood"}`;
+            const fb = { cuisines: loves.slice(0, 3), vibe: '' };
+            const out = await AI.json(prompt, schema, fb);
+            // Keep only real words (guards against models that echo "..." placeholders).
+            out.cuisines = (Array.isArray(out.cuisines) ? out.cuisines : []).filter(c => typeof c === 'string' && /[a-z]{2,}/i.test(c)).map(c => c.toLowerCase().trim());
+            if (!out.cuisines.length) out.cuisines = fb.cuisines;
+            return out;
+        }
+
+        // Score + pick the best candidate and write a short pitch. (function-call #2)
+        async function pickBest(candidates, extraIntent) {
+            const list = candidates.map((c, i) => `${i}. ${c.name.slice(0, 34)} (${(c.cuisine || c.kind).slice(0, 18)}, ${c.dist}m)`).join('\n');
+            const schema = { type: 'object', properties: { choice: { type: 'number' }, pitch: { type: 'string' } }, required: ['choice', 'pitch'] };
+            const want = [...Object.keys(State.profile.cuisines).filter(c => State.profile.cuisines[c] === 'love'), extraIntent].filter(Boolean).join(', ') || 'anything good';
+            const prompt = `Pick ONE restaurant for a group. They want: ${want.slice(0, 160)}. Closer is better.
+${list}
+Reply as JSON only: {"choice":<number>,"pitch":"warm 1-sentence pitch to the table"}`;
+            const fb = { choice: 0, pitch: `${candidates[0].name} is just ${candidates[0].dist} m away${candidates[0].cuisine ? ' and does great ' + candidates[0].cuisine : ''}.` };
+            const out = await AI.json(prompt, schema, fb);
+            let i = Math.round(out.choice); if (!(i >= 0 && i < candidates.length)) i = 0;
+            return { choice: i, pitch: (out.pitch || fb.pitch).trim() };
+        }
+
+        // My agent's stance on a proposal — speaks for ME using only my on-device profile.
+        async function evaluateProposal(proposal) {
+            // Hard rules first (deterministic) so private vetoes never depend on the model.
+            const nameLc = (proposal.name || '').toLowerCase();
+            const cuiLc = (proposal.cuisine || '').toLowerCase();
+            for (const r of State.rules) {
+                const tLc = (r.target || '').toLowerCase();
+                const hit = r.scope === 'restaurant' ? (tLc && nameLc.includes(tLc)) : (tLc && cuiLc.includes(tLc));
+                if (hit) {
+                    if (r.mode === 'never') return { stance: 'veto', reason: `I'd rather not — ${r.note || 'on my no-go list'}.` };
+                    if (r.mode === 'conditional') return { stance: 'concern', reason: `Only if ${r.condition}.` };
+                }
+            }
+            const avoids = Object.keys(State.profile.cuisines).filter(c => State.profile.cuisines[c] === 'avoid');
+            if (avoids.some(a => cuiLc.includes(a) || nameLc.includes(a))) return { stance: 'veto', reason: `Not keen on ${avoids.find(a => cuiLc.includes(a) || nameLc.includes(a))}.` };
+
+            // Otherwise ask the model to weigh it (with a safe fallback).
+            const schema = { type: 'object', properties: { stance: { type: 'string', enum: ['satisfied', 'concern', 'veto'] }, reason: { type: 'string' } }, required: ['stance', 'reason'] };
+            const prompt = `You answer on behalf of your owner about a restaurant another person suggested for the group.
+YOUR OWNER: ${myTasteSummary()}
+
+SUGGESTED: ${proposal.name} — ${proposal.cuisine || 'unknown cuisine'}, about ${proposal.dist} m away.
+
+Decide your owner's stance: "satisfied" (happy to go), "concern" (would go but has a worry), or "veto" (no). Be true to their tastes, diet, budget and distance limit. Give a short first-person reason.
+Respond ONLY as JSON: {"stance":"satisfied|concern|veto","reason":"one short sentence"}`;
+            const tooFar = proposal.dist > State.radius * 1.4;
+            const fb = { stance: tooFar ? 'concern' : 'satisfied', reason: tooFar ? `A bit far at ${proposal.dist} m.` : `Works for me — sounds good.` };
+            const out = await AI.json(prompt, schema, fb);
+            if (!['satisfied', 'concern', 'veto'].includes(out.stance)) out.stance = fb.stance;
+            return { stance: out.stance, reason: (out.reason || fb.reason).trim() };
+        }
+
+        // My agent answers an open table question (mood / concerns) on my behalf.
+        async function answerQuestion(topic, question, context) {
+            if (topic === 'mood') {
+                const schema = { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] };
+                const prompt = `Speak for your owner in ONE short, friendly sentence. What are they in the mood to eat tonight, and anything to avoid?
+YOUR OWNER: ${myTasteSummary()}
+Respond ONLY as JSON: {"text":"..."}`;
+                const loves = Object.keys(State.profile.cuisines).filter(c => State.profile.cuisines[c] === 'love');
+                const fb = { text: `I'm easy — ${loves.length ? 'leaning ' + loves.slice(0, 2).join(' or ') : 'open to most things'}, up to ${State.profile.budget}.` };
+                return (await AI.json(prompt, schema, fb)).text || fb.text;
+            }
+            // concerns about the latest proposal
+            const latest = State.proposals.find(p => !p.finalized);
+            if (latest) { const v = await evaluateProposal(latest); return `On ${latest.name}: ${v.stance} — ${v.reason}`; }
+            return `No concerns right now.`;
+        }
+
+        // ---- organiser actions ----
+        let busy = false;
+        async function runConcierge(extraIntent = '') {
+            if (busy) return; if (!AI.ready) return toast('AI is still warming up…', 'bad');
+            busy = true; $('find-btn').disabled = true;
+            try {
+                const loc = await ensureLocation(); if (!loc) return;
+                feedSys(`🔎 Concierge searching near <b>${esc(loc.label || 'you')}</b>…`);
+                const plan = await planSearch(extraIntent);
+                feedTool('search_restaurants', { near: loc.label, cuisines: plan.cuisines, radius: State.radius });
+                let cands = await searchRestaurants(loc.lat, loc.lon, State.radius);
+                cands = filterCandidates(cands, plan.cuisines);
+                if (!cands.length) { feedSys('No fresh options matched — try widening distance or clearing some vetoes.'); toast('No new options found nearby.', 'bad'); return; }
+                const pick = await pickBest(cands.slice(0, 10), extraIntent);
+                await proposeCandidate(cands[pick.choice], pick.pitch);
+            } catch (e) {
+                console.error(e); feedSys(`Search failed: ${esc(e.message)}`); toast('Search failed — check connection.', 'bad');
+            } finally { busy = false; $('find-btn').disabled = false; }
+        }
+
+        // Rank candidates: prefer cuisine hints & loves, drop my hard no-gos and anything already on the table.
+        function filterCandidates(cands, cuisineHints = []) {
+            const loves = Object.keys(State.profile.cuisines).filter(c => State.profile.cuisines[c] === 'love');
+            const avoids = Object.keys(State.profile.cuisines).filter(c => State.profile.cuisines[c] === 'avoid');
+            const neverNames = State.rules.filter(r => r.mode === 'never' && r.scope === 'restaurant').map(r => r.target.toLowerCase());
+            const neverCui = State.rules.filter(r => r.mode === 'never' && r.scope === 'cuisine').map(r => r.target.toLowerCase());
+            const onTable = new Set(State.proposals.map(p => p.name.toLowerCase()));
+            const hints = cuisineHints.map(h => h.toLowerCase());
+            return cands.filter(c => {
+                const nm = c.name.toLowerCase(), cu = c.cuisine.toLowerCase();
+                if (onTable.has(nm) || State.vetoedNames.has(nm)) return false;
+                if (neverNames.some(n => n && nm.includes(n))) return false;
+                if (avoids.concat(neverCui).some(a => a && cu.includes(a))) return false;
+                return true;
+            }).map(c => {
+                const cu = c.cuisine.toLowerCase();
+                let score = 0;
+                if (hints.some(h => cu.includes(h) || c.name.toLowerCase().includes(h))) score += 5;
+                if (loves.some(l => cu.includes(l))) score += 3;
+                score -= c.dist / 1000;
+                return { ...c, _score: score };
+            }).sort((a, b) => b._score - a._score);
+        }
+
+        async function proposeCandidate(c, pitch) {
+            const proposal = {
+                id: uid(), name: c.name, cuisine: c.cuisine, dist: c.dist, address: c.address, lat: c.lat, lon: c.lon,
+                pitch: pitch || '', by: Mesh.myId, byName: State.profile.name, verdicts: {}, finalized: false
+            };
+            State.proposals.unshift(proposal);
+            renderProposals();
+            feedSys(`🍴 Your concierge suggests <b>${esc(c.name)}</b>.`);
+            Mesh.emit('PROPOSE', { proposal: serializeProposal(proposal) });
+            // I'm satisfied with my own pick by default, but record it honestly via my evaluator.
+            const v = await evaluateProposal(proposal);
+            setMyVerdict(proposal, v, true);
+        }
+
+        function setMyVerdict(proposal, v, broadcast) {
+            proposal.verdicts[Mesh.myId] = { stance: v.stance, reason: v.reason, name: State.profile.name, emoji: State.profile.emoji };
+            renderProposals();
+            if (broadcast && Mesh.online) Mesh.emit('VERDICT', { proposalId: proposal.id, stance: v.stance, reason: v.reason });
+            if (v.stance !== 'satisfied') feedSys(`Your agent flagged <b>${esc(proposal.name)}</b>: ${esc(v.stance)} — ${esc(v.reason)}`);
+        }
+
+        // Manual override of my own stance (the human has the final say over their agent).
+        function setManualStance(proposalId, stance) {
+            const proposal = findProposal(proposalId); if (!proposal) return;
+            const reason = { satisfied: 'I\'m happy with this.', concern: 'I have a slight concern.', veto: 'I\'d rather not.' }[stance];
+            setMyVerdict(proposal, { stance, reason }, true);
+            if (stance === 'veto' || stance === 'concern') { State.vetoedNames.add(proposal.name.toLowerCase()); openOpinion(proposal, stance); }
+        }
+
+        function askTable() {
+            if (!Mesh.conns.size) { runMyMood(); return toast('No one connected yet — share your invite link.', 'bad'); }
+            const question = `What's everyone in the mood for tonight, and anything to avoid?`;
+            const askId = uid();
+            Mesh.emit('ASK', { topic: 'mood', askId, question });
+            feedAsk(State.profile.name, State.profile.emoji, question + ' <span style="color:var(--faint)">(asking everyone)</span>');
+            runMyMood();
+        }
+        async function runMyMood() {
+            const text = await answerQuestion('mood');
+            State.peerMoods[Mesh.myId] = `${State.profile.name}: ${text}`;
+            feedAnswer(State.profile.name, State.profile.emoji, text, true);
+        }
+
+        function finalizeProposal(id) {
+            const proposal = findProposal(id); if (!proposal) return;
+            proposal.finalized = true; State.proposals.forEach(x => { if (x.id !== id) x.finalized = false; });
+            renderProposals();
+            Mesh.emit('FINALIZE', { proposalId: id });
+            feedSys(`🎉 You locked in <b>${esc(proposal.name)}</b>. Telling the table…`);
+            toast(`Locked in: ${proposal.name} 🎉`, 'ok');
+        }
+
+        /* ======================================================================
+           RENDERING
+           ====================================================================== */
+        function renderProfile() { $('id-name').textContent = State.profile.name; $('id-ava').textContent = State.profile.emoji || '🙂'; }
+
+        function renderCuisines() {
+            const wrap = $('cuisine-chips'); wrap.innerHTML = '';
+            const all = [...DEFAULT_CUISINES, ...State.profile.extraCuisines];
+            all.forEach(c => {
+                const st = State.profile.cuisines[c]; // undefined | love | avoid
+                const chip = document.createElement('div');
+                chip.className = `chip ${st || ''}`;
+                chip.innerHTML = `${st === 'love' ? '<i class="fa-solid fa-heart"></i>' : st === 'avoid' ? '<i class="fa-solid fa-ban"></i>' : ''} ${esc(c)}`;
+                chip.onclick = () => {
+                    const cur = State.profile.cuisines[c];
+                    if (!cur) State.profile.cuisines[c] = 'love';
+                    else if (cur === 'love') State.profile.cuisines[c] = 'avoid';
+                    else delete State.profile.cuisines[c];
+                    State.save(); renderCuisines();
+                };
+                wrap.appendChild(chip);
+            });
+        }
+        function renderDiet() {
+            const wrap = $('diet-chips'); wrap.innerHTML = '';
+            DIET_TAGS.forEach(d => {
+                const on = State.profile.diet.includes(d);
+                const chip = document.createElement('div');
+                chip.className = `chip ${on ? 'on' : ''}`;
+                chip.textContent = d;
+                chip.onclick = () => {
+                    if (on) State.profile.diet = State.profile.diet.filter(x => x !== d);
+                    else State.profile.diet.push(d);
+                    State.save(); renderDiet();
+                };
+                wrap.appendChild(chip);
+            });
+        }
+        function renderRules() {
+            const list = $('rule-list'); list.innerHTML = '';
+            if (!State.rules.length) { list.innerHTML = `<div class="empty">No rules yet. Add places to avoid, or conditions like "sushi only on payday".</div>`; }
+            State.rules.forEach(r => {
+                const item = document.createElement('div');
+                item.className = `rule-item ${r.mode === 'conditional' ? 'conditional' : ''}`;
+                const ico = r.mode === 'conditional' ? '⚠️' : '🚫';
+                const desc = r.mode === 'conditional' ? `Only if ${esc(r.condition)}` : 'Never suggest';
+                item.innerHTML = `<span class="ri-ico">${ico}</span>
+                    <div class="ri-body"><div class="ri-t">${esc(r.target)} <span style="color:var(--faint);font-weight:400;font-size:.72rem">· ${r.scope}</span></div>
+                    <div class="ri-d">${desc}${r.note ? ' — ' + esc(r.note) : ''}</div></div>
+                    <button class="icon-btn" data-del-rule="${r.id}" style="width:26px;height:26px;font-size:.7rem"><i class="fa-solid fa-xmark"></i></button>`;
+                list.appendChild(item);
+            });
+            $('rule-count').textContent = State.rules.length;
+        }
+        function renderLocation() {
+            $('loc-label').textContent = State.location ? (State.location.label || `${State.location.lat.toFixed(3)}, ${State.location.lon.toFixed(3)}`) : 'Location not set';
+        }
+        function renderPeers() {
+            const list = $('peer-list');
+            list.innerHTML = '';
+            const self = document.createElement('div');
+            self.className = 'peer-card';
+            self.innerHTML = `<span class="pdot self"></span><span class="pe">${esc(State.profile.emoji)}</span>
+                <div class="pmeta"><div class="pn">${esc(State.profile.name)} <span style="color:var(--faint);font-weight:400">· you</span></div><div class="pi">${esc(Mesh.myId || '…')}</div></div>
+                ${State.isHost ? '<span class="ptag">host</span>' : ''}`;
+            list.appendChild(self);
+            [...Mesh.conns.values()].forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'peer-card';
+                card.innerHTML = `<span class="pdot ${p.relayed ? 'relayed' : ''}"></span><span class="pe">${esc(p.emoji || '🙂')}</span>
+                    <div class="pmeta"><div class="pn">${esc(p.name)}</div><div class="pi">${esc(p.conn.peer)}</div></div>`;
+                list.appendChild(card);
+            });
+            const n = Mesh.conns.size;
+            $('peer-count').textContent = n === 0 ? 'just you' : `${n + 1} at the table`;
+        }
+
+        function participantIds() { return [Mesh.myId, ...Mesh.conns.keys()]; }
+        function participantInfo(pid) {
+            if (pid === Mesh.myId) return { name: State.profile.name, emoji: State.profile.emoji };
+            const c = Mesh.conns.get(pid); return c ? { name: c.name, emoji: c.emoji } : { name: pid, emoji: '🙂' };
+        }
+
+        function renderProposals() {
+            const list = $('cand-list');
+            if (!State.proposals.length) {
+                list.innerHTML = `<div class="empty">No options yet. Hit <b>Find a place</b> to search nearby, or tell your concierge what you're craving. Proposals you and your friends make show up here, with everyone's verdict.</div>`;
+                $('cand-count').textContent = 'no options yet'; return;
+            }
+            list.innerHTML = '';
+            State.proposals.forEach(p => list.appendChild(buildCandCard(p)));
+            $('cand-count').textContent = `${State.proposals.length} option${State.proposals.length === 1 ? '' : 's'}`;
+        }
+
+        function buildCandCard(p) {
+            const card = document.createElement('div');
+            card.className = 'cand' + (p.finalized ? ' finalized' : '');
+            const meta = [];
+            if (p.cuisine) meta.push(`<span><i class="fa-solid fa-utensils"></i> ${esc(p.cuisine)}</span>`);
+            meta.push(`<span><i class="fa-solid fa-person-walking"></i> ${p.dist} m</span>`);
+            if (p.address) meta.push(`<span><i class="fa-solid fa-location-dot"></i> ${esc(p.address)}</span>`);
+            const mapsUrl = `https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}#map=18/${p.lat}/${p.lon}`;
+
+            // stance chips for every participant
+            const ids = participantIds();
+            const stanceHtml = ids.map(pid => {
+                const v = p.verdicts[pid];
+                const info = participantInfo(pid);
+                const stance = v ? v.stance : 'pending';
+                const face = { satisfied: '😋', concern: '🤔', veto: '🙅', pending: '⏳' }[stance];
+                const reason = v ? v.reason : 'waiting for their agent…';
+                return `<span class="stance ${stance}"><span class="se">${esc(info.emoji)}</span> ${esc(info.name)}${pid === Mesh.myId ? ' (you)' : ''} <span class="se">${face}</span><span class="tip">${esc(reason)}</span></span>`;
+            }).join('');
+
+            const allHappy = ids.every(pid => p.verdicts[pid] && p.verdicts[pid].stance !== 'veto') && ids.every(pid => p.verdicts[pid]);
+            const anyVeto = ids.some(pid => p.verdicts[pid] && p.verdicts[pid].stance === 'veto');
+            const mine = p.by === Mesh.myId;
+
+            let foot = '';
+            if (p.finalized) {
+                foot = `<div class="final-banner"><span class="fb-emoji">🎉</span> Locked in — see you at ${esc(p.name)}!</div>`;
+            } else {
+                const mineStance = p.verdicts[Mesh.myId] ? p.verdicts[Mesh.myId].stance : null;
+                foot = `<div class="c-foot">
+                    <button class="btn btn-sm ${mineStance === 'satisfied' ? '' : 'btn-ghost'}" data-stance="satisfied" data-pid="${p.id}">😋 I'm in</button>
+                    <button class="btn btn-sm ${mineStance === 'concern' ? '' : 'btn-ghost'}" data-stance="concern" data-pid="${p.id}">🤔 Concern</button>
+                    <button class="btn btn-sm ${mineStance === 'veto' ? '' : 'btn-ghost'}" data-stance="veto" data-pid="${p.id}">🙅 No</button>
+                    <span class="grow"></span>
+                    ${mine ? `<button class="btn btn-sm" data-finalize="${p.id}" ${allHappy && !anyVeto ? '' : 'style="opacity:.6"'}><i class="fa-solid fa-circle-check"></i> ${allHappy && !anyVeto ? 'Finalise — all happy!' : 'Finalise anyway'}</button>` : `<span style="font-size:.74rem;color:var(--faint)">${esc(p.byName)}'s pick${allHappy && !anyVeto ? ' · all happy ✓' : ''}</span>`}
+                </div>`;
+            }
+
+            card.innerHTML = `
+                <div class="c-head">
+                    <div class="c-ico">🍽️</div>
+                    <div style="flex:1;min-width:0">
+                        <div class="c-name">${esc(p.name)}</div>
+                        <div class="c-meta">${meta.join('')}</div>
+                        <div class="c-by">proposed by ${esc(p.byName)}${mine ? ' (you)' : ''} · <a href="${mapsUrl}" target="_blank" rel="noopener">map ↗</a></div>
+                    </div>
+                </div>
+                ${p.pitch ? `<div class="c-pitch"><span class="q">“</span>${esc(p.pitch)}<span class="q">”</span></div>` : ''}
+                <div class="stances">${stanceHtml}</div>
+                ${foot}`;
+            return card;
+        }
+
+        /* ---- activity feed ---- */
+        const FEED_MAX = 80;
+        function feedPush(kind, icon, html) {
+            const feed = $('feed');
+            if (feed.querySelector('.empty')) feed.innerHTML = '';
+            const el = document.createElement('div');
+            el.className = `fe ${kind}`;
+            el.innerHTML = `<div class="fa-ico"><i class="fa-solid ${icon}"></i></div><div class="fa-body">${html}</div>`;
+            feed.appendChild(el);
+            while (feed.children.length > FEED_MAX) feed.removeChild(feed.firstChild);
+            feed.scrollTop = feed.scrollHeight;
+        }
+        const feedSys = html => feedPush('sys', 'fa-bolt', `${html} <span class="fa-time">· ${ago(now())}</span>`);
+        const feedTool = (name, args) => feedPush('tool', 'fa-screwdriver-wrench', `called <code>${esc(name)}(${esc(JSON.stringify(args))})</code>`);
+        const feedAsk = (who, emoji, html) => feedPush('ask', 'fa-circle-question', `<span class="fa-who">${esc(emoji)} ${esc(who)}</span> ${html}`);
+        const feedAnswer = (who, emoji, text, mine) => feedPush('ask', 'fa-comment-dots', `<span class="fa-who">${esc(emoji)} ${esc(who)}${mine ? ' (your agent)' : ''}</span><div class="bubble">${esc(text)}</div>`);
+        const feedChat = (who, emoji, text) => feedPush('chat', 'fa-comment', `<span class="fa-who">${esc(emoji)} ${esc(who)}</span><div class="bubble">${esc(text)}</div>`);
+
+        function toast(msg, kind = '') {
+            const el = document.createElement('div');
+            el.className = `toast ${kind}`; el.textContent = msg;
+            $('toast-wrap').appendChild(el);
+            setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 3200);
+        }
+
+        /* ======================================================================
+           IMPORT / EXPORT
+           ====================================================================== */
+        function exportPrefs() {
+            const blob = new Blob([JSON.stringify(State.exportBundle(), null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `${State.profile.name.replace(/\s+/g, '-').toLowerCase()}.matchmeal.json`;
+            a.click(); URL.revokeObjectURL(a.href);
+            toast('Preferences exported.', 'ok');
+        }
+        function applyImport(text) {
+            try {
+                State.importBundle(JSON.parse(text));
+                renderAll(); closeModal('import-modal');
+                toast('Preferences imported.', 'ok');
+            } catch (e) { toast('Could not read that file: ' + e.message, 'bad'); }
+        }
+
+        function renderAll() {
+            renderProfile(); renderCuisines(); renderDiet(); renderRules(); renderLocation(); renderPeers(); renderProposals();
+            $('budget').value = State.profile.budget;
+            $('radius').value = State.radius;
+            $('notes').value = State.profile.notes || '';
+            $('role-host').checked = State.isHost;
+        }
+
+        /* ======================================================================
+           MODALS + WIRING
+           ====================================================================== */
+        function openModal(id) { $(id).classList.add('show'); }
+        function closeModal(id) { $(id).classList.remove('show'); }
+
+        let opinionCtx = null;
+        function openOpinion(proposal, stance) {
+            opinionCtx = { proposal, stance, op: 'never' };
+            $('opinion-ctx').innerHTML = `You weren't keen on <b>${esc(proposal.name)}</b>${proposal.cuisine ? ' (' + esc(proposal.cuisine) + ')' : ''}. Want your AI to remember so it stops suggesting it?`;
+            $('opinion-seg').querySelectorAll('.opt').forEach(o => o.classList.toggle('active', o.dataset.op === 'never'));
+            $('opinion-cond-field').style.display = 'none';
+            $('opinion-condition').value = ''; $('opinion-note').value = '';
+            openModal('opinion-modal');
+        }
+
+        function wire() {
+            // profile
+            $('edit-profile').onclick = () => { $('pf-name').value = State.profile.name; $('pf-emoji').value = State.profile.emoji; openModal('profile-modal'); };
+            $('pf-save').onclick = () => {
+                State.profile.name = $('pf-name').value.trim() || randomName();
+                State.profile.emoji = $('pf-emoji').value.trim() || '🙂';
+                State.save(); renderProfile(); renderPeers(); closeModal('profile-modal'); toast('Profile saved.', 'ok');
+            };
+            $('copy-id').onclick = () => navigator.clipboard.writeText(Mesh.myId || '').then(() => toast('Your id is copied.', 'ok'));
+            $('share-btn').onclick = () => {
+                const link = `${location.origin}${location.pathname}?join=${Mesh.myId || ''}`;
+                navigator.clipboard.writeText(link).then(() => toast('Invite link copied — send it to a friend.', 'ok'));
+            };
+            $('join-btn').onclick = () => {
+                const id = $('join-id').value.trim(); if (!id) return toast('Paste a friend\'s id first.', 'bad');
+                Mesh.connectTo(id); toast(`Connecting to ${id}…`); $('join-id').value = '';
+            };
+            $('role-host').onchange = e => { State.isHost = e.target.checked; State.save(); updateMeshStat(); renderPeers(); if (State.isHost && Mesh.peer && Mesh.peer.disconnected) { try { Mesh.peer.reconnect(); } catch (_) { } } };
+
+            // taste
+            $('budget').onchange = e => { State.profile.budget = e.target.value; State.save(); };
+            $('radius').onchange = e => { State.radius = parseInt(e.target.value, 10); State.save(); };
+            $('notes').oninput = e => { State.profile.notes = e.target.value; State.save(); };
+            $('add-cuisine').onclick = () => { $('cuisine-new').value = ''; openModal('cuisine-modal'); };
+            $('cuisine-add-save').onclick = () => {
+                const c = $('cuisine-new').value.trim().toLowerCase(); if (!c) return;
+                if (!DEFAULT_CUISINES.includes(c) && !State.profile.extraCuisines.includes(c)) State.profile.extraCuisines.push(c);
+                State.profile.cuisines[c] = 'love'; State.save(); renderCuisines(); closeModal('cuisine-modal');
+            };
+
+            // rules
+            let ruleScope = 'restaurant', ruleMode = 'never';
+            $('add-rule').onclick = () => { ruleScope = 'restaurant'; ruleMode = 'never'; $('rule-target').value = ''; $('rule-condition').value = ''; $('rule-note').value = ''; syncRuleSeg(); $('rule-cond-field').style.display = 'none'; openModal('rule-modal'); };
+            function syncRuleSeg() {
+                $('rule-scope-seg').querySelectorAll('.opt').forEach(o => o.classList.toggle('active', o.dataset.scope === ruleScope));
+                $('rule-mode-seg').querySelectorAll('.opt').forEach(o => o.classList.toggle('active', o.dataset.mode === ruleMode));
+            }
+            $('rule-scope-seg').onclick = e => { const o = e.target.closest('[data-scope]'); if (!o) return; ruleScope = o.dataset.scope; syncRuleSeg(); };
+            $('rule-mode-seg').onclick = e => { const o = e.target.closest('[data-mode]'); if (!o) return; ruleMode = o.dataset.mode; $('rule-cond-field').style.display = ruleMode === 'conditional' ? 'block' : 'none'; syncRuleSeg(); };
+            $('rule-save').onclick = () => {
+                const target = $('rule-target').value.trim(); if (!target) return toast('What is the rule about?', 'bad');
+                if (ruleMode === 'conditional' && !$('rule-condition').value.trim()) return toast('Add the condition.', 'bad');
+                State.rules.unshift({ id: uid(), scope: ruleScope, target, mode: ruleMode, condition: $('rule-condition').value.trim(), note: $('rule-note').value.trim() });
+                State.save(); renderRules(); closeModal('rule-modal'); toast('Rule saved — your AI will honour it.', 'ok');
+            };
+            $('rule-list').addEventListener('click', e => {
+                const d = e.target.closest('[data-del-rule]'); if (d) { State.rules = State.rules.filter(r => r.id !== d.dataset.delRule); State.save(); renderRules(); }
+            });
+
+            // concierge
+            $('find-btn').onclick = () => runConcierge('');
+            $('ask-table-btn').onclick = askTable;
+            const ci = $('concierge-input');
+            const grow = el => { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 140) + 'px'; };
+            ci.addEventListener('input', () => grow(ci));
+            const sendConcierge = () => { const t = ci.value.trim(); if (!t) return; feedChat(State.profile.name, State.profile.emoji, t); ci.value = ''; grow(ci); runConcierge(t); };
+            $('concierge-send').onclick = sendConcierge;
+            ci.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendConcierge(); } });
+
+            // candidate actions (event delegation)
+            $('cand-list').addEventListener('click', e => {
+                const st = e.target.closest('[data-stance]'), fin = e.target.closest('[data-finalize]');
+                if (st) setManualStance(st.dataset.pid, st.dataset.stance);
+                if (fin) finalizeProposal(fin.dataset.finalize);
+            });
+
+            // table chat
+            const chat = $('chat-input');
+            chat.addEventListener('input', () => grow(chat));
+            const sendChat = () => { const t = chat.value.trim(); if (!t) return; feedChat(State.profile.name, State.profile.emoji, t); Mesh.emit('CHAT', { text: t }); chat.value = ''; grow(chat); };
+            $('chat-send').onclick = sendChat;
+            chat.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
+            $('clear-feed').onclick = () => { $('feed').innerHTML = '<div class="empty">Cleared.</div>'; };
+
+            // location
+            $('loc-set').onclick = () => { State.location = null; ensureLocation(); };
+            $('loc-manual').onclick = () => { if (State.location) { $('loc-lat').value = State.location.lat; $('loc-lon').value = State.location.lon; } openModal('loc-modal'); };
+            $('loc-lookup').onclick = async () => {
+                const q = $('loc-query').value.trim(); if (!q) return;
+                try { const r = await geocode(q); $('loc-lat').value = r.lat; $('loc-lon').value = r.lon; $('loc-query').dataset.label = r.label; toast('Found: ' + r.label, 'ok'); }
+                catch (e) { toast(e.message, 'bad'); }
+            };
+            $('loc-save').onclick = () => {
+                const lat = parseFloat($('loc-lat').value), lon = parseFloat($('loc-lon').value);
+                if (!Number.isFinite(lat) || !Number.isFinite(lon)) return toast('Enter valid coordinates.', 'bad');
+                State.location = { lat, lon, label: $('loc-query').dataset.label || `${lat.toFixed(3)}, ${lon.toFixed(3)}`, ts: now() };
+                State.save(); renderLocation(); closeModal('loc-modal'); toast('Location set.', 'ok');
+            };
+
+            // opinion (store dissatisfaction as a preference)
+            $('opinion-seg').onclick = e => { const o = e.target.closest('[data-op]'); if (!o || !opinionCtx) return; opinionCtx.op = o.dataset.op; $('opinion-seg').querySelectorAll('.opt').forEach(x => x.classList.toggle('active', x === o)); $('opinion-cond-field').style.display = o.dataset.op === 'conditional' ? 'block' : 'none'; };
+            $('opinion-save').onclick = () => {
+                if (!opinionCtx) return; const p = opinionCtx.proposal;
+                const note = $('opinion-note').value.trim();
+                if (opinionCtx.op === 'cuisine' && p.cuisine) { const c = p.cuisine.split(' ')[0].toLowerCase(); State.profile.cuisines[c] = 'avoid'; if (!DEFAULT_CUISINES.includes(c) && !State.profile.extraCuisines.includes(c)) State.profile.extraCuisines.push(c); }
+                else if (opinionCtx.op === 'conditional') State.rules.unshift({ id: uid(), scope: 'restaurant', target: p.name, mode: 'conditional', condition: $('opinion-condition').value.trim() || 'a special occasion', note });
+                else State.rules.unshift({ id: uid(), scope: 'restaurant', target: p.name, mode: 'never', condition: '', note });
+                State.save(); renderRules(); renderCuisines(); closeModal('opinion-modal'); toast('Saved — your AI will remember.', 'ok');
+            };
+
+            // import / export
+            $('export-btn').onclick = exportPrefs;
+            $('import-btn').onclick = () => { $('import-text').value = ''; openModal('import-modal'); };
+            $('import-file-btn').onclick = () => $('import-file').click();
+            $('import-file').onchange = e => { const f = e.target.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => applyImport(rd.result); rd.readAsText(f); };
+            $('import-apply').onclick = () => { const t = $('import-text').value.trim(); if (!t) return toast('Paste JSON or choose a file.', 'bad'); applyImport(t); };
+
+            // reset
+            $('reset-link').onclick = () => { if (confirm('Forget your profile, rules and location on this device?')) { ['mm_profile', 'mm_rules', 'mm_location', 'mm_radius', 'mm_host'].forEach(k => localStorage.removeItem(k)); location.reload(); } };
+
+            // modal close
+            document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => closeModal(b.dataset.close));
+            document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) closeModal(o.id); }));
+        }
+
+        /* ======================================================================
+           BOOTSTRAP
+           ====================================================================== */
+        async function bootApp() {
+            State.load();
+            renderAll();
+            wire();
+
+            const chip = $('top-backend'), lbl = $('top-backend-label');
+            if (AI.backend === 'chrome') { chip.className = 'backend-chip ok'; lbl.textContent = 'Chrome built-in AI'; }
+            else { chip.className = 'backend-chip gemma'; lbl.textContent = 'On-device Gemma'; }
+
+            $('loader').style.display = 'none';
+            $('app').style.display = 'block';
+
+            try {
+                const id = await Mesh.start();
+                $('id-pid').textContent = id; renderPeers(); updateMeshStat();
+                feedSys('You\'re online. Share your invite link to bring friends to the table.');
+            } catch (e) { console.error(e); $('id-pid').textContent = 'offline'; toast('Could not reach the signalling broker.', 'bad'); }
+
+            // auto-join via ?join=<id>
+            const params = new URLSearchParams(location.search);
+            if (params.get('join')) { $('join-id').value = params.get('join'); $('role-host').checked = State.isHost; setTimeout(() => $('join-btn').click(), 800); }
+        }
+
+        async function init() {
+            const backend = await AI.detect();
+            const chip = $('backend-chip'), label = $('backend-label');
+            const action = $('gate-action'), note = $('gate-note'), sub = $('gate-sub');
+            if (backend === 'chrome') {
+                chip.className = 'backend-chip ok';
+                label.textContent = 'Chrome built-in AI detected';
+                note.innerHTML = 'Your browser has the built-in <b>Prompt API</b>, so your concierge reasons entirely on-device. Your tastes never leave your machine — only the verdicts you choose to share.';
+                sub.textContent = "Powered by Chrome's built-in language model.";
+                AI.ready = true;
+            } else {
+                chip.className = 'backend-chip gemma';
+                label.textContent = 'No built-in AI — using Gemma';
+                note.innerHTML = 'No built-in AI found, so your concierge runs Google <b>Gemma</b> locally via WebGPU. First run is a one-time <b>≈ 2 GB</b> download, cached for next time.';
+                sub.textContent = 'Needs Chrome or Edge with WebGPU. Downloads only when you continue.';
+            }
+            action.style.display = 'block';
+
+            $('enter-btn').onclick = async () => {
+                if (backend === 'gemma') {
+                    action.style.display = 'none';
+                    $('gate-loading').style.display = 'block';
+                    try { await loadGemma(); AI.ready = true; }
+                    catch (e) { console.error(e); $('loader-message').textContent = 'Could not load Gemma: ' + e.message; return; }
+                }
+                bootApp();
+            };
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+        if (document.readyState !== 'loading') init();
+    </script>
+</body>
+
+</html>
