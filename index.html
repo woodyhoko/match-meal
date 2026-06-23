@@ -116,10 +116,42 @@
             display: flex; flex-direction: column; position: relative;
             padding: 0 16px calc(env(safe-area-inset-bottom) + 18px);
         }
-        @media (min-width: 540px) {
+        @media (min-width: 540px) and (max-width: 899px) {
             #shell { box-shadow: var(--shadow-lg); background: var(--bg); border-radius: 34px; margin-top: 20px; margin-bottom: 20px; min-height: calc(100dvh - 40px); overflow: hidden; padding-bottom: 22px; }
             body { padding: 0; }
         }
+
+        /* ---------------- Desktop: a genuinely different, roomier layout ---------------- */
+        @media (min-width: 900px) {
+            :root { --shell: 1120px; }
+            body { padding: 26px 0; }
+            #shell { background: var(--card); border-radius: 28px; box-shadow: var(--shadow-lg); min-height: auto; padding: 8px 30px 30px; }
+            .topbar { padding: 22px 4px 18px; background: none; position: static; }
+            .brand .logo { width: 46px; height: 46px; font-size: 1.35rem; }
+            .brand .tt { font-size: 1.5rem; }
+            .brand .ss { font-size: .84rem; }
+            /* two columns: sticky control rail + a roomy board */
+            .cols { display: grid; grid-template-columns: 340px 1fr; gap: 30px; align-items: start; }
+            .side { position: sticky; top: 26px; display: flex; flex-direction: column; gap: 16px; }
+            .side .members, .side .locbar, .side .find-wrap { margin: 0; }
+            .side .members { flex-wrap: wrap; padding: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: var(--r); box-shadow: var(--shadow-sm); }
+            .side .members .share-mini { flex-basis: 100%; justify-content: center; margin: 6px 0 0; }
+            .side .find-wrap { padding: 4px; }
+            .sec-h { margin-top: 4px; }
+            .sec-h h2 { font-size: 1.35rem; }
+            /* board becomes a responsive card grid (mobile is a single column) */
+            #board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+            #board .opt { margin-bottom: 0; }
+            #board .empty, #board .skel:first-child { grid-column: 1 / -1; }
+            .footnote { grid-column: 1 / -1; }
+            /* bottom sheets become centered modal dialogs on desktop */
+            .sheet { left: 50%; right: auto; top: 50%; bottom: auto; margin: 0; max-width: 460px; border-radius: 24px; max-height: 86dvh; transform: translate(-50%, -46%); opacity: 0; transition: transform .32s var(--ease), opacity .28s var(--ease); }
+            .sheet.show { transform: translate(-50%, -50%); opacity: 1; }
+            .grab { display: none; }
+            .sheet h3 { margin-top: 8px; }
+        }
+        .sheet { pointer-events: none; }
+        .sheet.show { pointer-events: auto; }
 
         @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
@@ -310,11 +342,11 @@
         .scrim { position: fixed; inset: 0; z-index: 60; background: rgba(30, 16, 8, .42); backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity .3s; }
         .scrim.show { opacity: 1; pointer-events: auto; }
         .sheet {
-            position: fixed; left: 50%; transform: translateX(-50%) translateY(102%); bottom: 0; z-index: 61; width: 100%; max-width: var(--shell);
+            position: fixed; left: 0; right: 0; margin: 0 auto; bottom: 0; z-index: 61; width: 100%; max-width: var(--shell);
             background: var(--card); border-radius: 26px 26px 0 0; box-shadow: var(--shadow-lg); padding: 10px 18px calc(env(safe-area-inset-bottom) + 20px);
-            max-height: 90dvh; overflow-y: auto; transition: transform .42s var(--ease);
+            max-height: 90dvh; overflow-y: auto; transform: translateY(102%); transition: transform .42s var(--ease);
         }
-        .sheet.show { transform: translateX(-50%) translateY(0); animation: sheetUp .42s var(--ease); }
+        .sheet.show { transform: translateY(0); }
         .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line-2); margin: 6px auto 14px; }
         .sheet h3 { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; margin: 0 0 4px; }
         .sheet .sub { color: var(--ink-2); font-size: .96rem; line-height: 1.5; margin: 0 0 18px; }
@@ -894,11 +926,17 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
                         <div class="statuspill" id="statpill"><span class="live"></span><span id="stat-label">online</span></div>
                         <button class="iconbtn" id="open-settings"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
                     </div>
-                    <div class="members" id="members"></div>
-                    <div class="locbar" id="locbar"></div>
-                    <div class="find-wrap"><button class="btn block lg" id="find-btn"></button><div class="find-hint" id="find-hint"></div></div>
-                    <div class="sec-h"><h2>On the table</h2><span class="n" id="board-n"></span></div>
-                    <div id="board"></div>
+                    <div class="cols">
+                        <aside class="side">
+                            <div class="members" id="members"></div>
+                            <div class="locbar" id="locbar"></div>
+                            <div class="find-wrap"><button class="btn block lg" id="find-btn"></button><div class="find-hint" id="find-hint"></div></div>
+                        </aside>
+                        <section class="main">
+                            <div class="sec-h"><h2>On the table</h2><span class="n" id="board-n"></span></div>
+                            <div id="board"></div>
+                        </section>
+                    </div>
                     <div class="footnote"><a href="classic.html">classic version</a> · © 2026 woodyhoko</div>`;
                 shell.appendChild(root);
                 $('open-settings').onclick = () => { syncSettingsSheet(); openSheet('sheet-settings'); };
@@ -944,15 +982,16 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
                 board.innerHTML = `<div class="empty"><span class="be">🍜</span>${Mesh.conns.size ? 'Nothing on the table yet.<br>Hit <b>Find places</b> to load spots everyone can react to.' : 'Invite a friend, set your spot,<br>then find places together.'}</div>`;
                 return;
             }
-            // FLIP: record old positions
+            // FLIP: record old positions (x AND y, so grid re-ranking glides too)
             const first = {};
-            board.querySelectorAll('.opt').forEach(c => first[c.dataset.id] = c.getBoundingClientRect().top);
+            board.querySelectorAll('.opt').forEach(c => { const r = c.getBoundingClientRect(); first[c.dataset.id] = { x: r.left, y: r.top }; });
             board.innerHTML = '';
             ranked.forEach((o, idx) => board.appendChild(optCard(o, idx)));
             // FLIP: invert + play
             board.querySelectorAll('.opt').forEach(c => {
-                const last = c.getBoundingClientRect().top; const d = (first[c.dataset.id] ?? last) - last;
-                if (d) { c.style.transform = `translateY(${d}px)`; c.style.transition = 'none'; requestAnimationFrame(() => { c.style.transition = ''; c.style.transform = ''; }); }
+                const r = c.getBoundingClientRect(); const f = first[c.dataset.id]; if (!f) return;
+                const dx = f.x - r.left, dy = f.y - r.top;
+                if (dx || dy) { c.style.transform = `translate(${dx}px, ${dy}px)`; c.style.transition = 'none'; requestAnimationFrame(() => { c.style.transition = ''; c.style.transform = ''; }); }
             });
         }
 
@@ -960,7 +999,9 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
             const c = consensusState(o);
             const card = el('div', 'opt' + (o.won ? ' won' : (idx === 0 && c.total > 1 ? ' top' : '')));
             card.dataset.id = o.id;
-            const maps = `https://www.openstreetmap.org/?mlat=${o.lat}&mlon=${o.lon}#map=18/${o.lat}/${o.lon}`;
+            const q = encodeURIComponent(`${o.name} ${o.lat},${o.lon}`);
+            const gmaps = `https://www.google.com/maps/search/?api=1&query=${q}`;
+            const gdir = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(o.lat + ',' + o.lon)}`;
             const mem = liveMembers();
             const tally = mem.map(m => {
                 const r = o.reactions[m.id];
@@ -979,7 +1020,7 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
                         <div class="opt-meta">
                             ${o.cuisine ? `<span>${esc(o.cuisine)}</span>` : ''}
                             <span><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg>${o.dist}m</span>
-                            <a href="${maps}" target="_blank" rel="noopener">map ↗</a>
+                            <a href="${gmaps}" target="_blank" rel="noopener" title="See ratings, reviews & photos on Google Maps">★ reviews &amp; photos ↗</a>
                         </div>
                     </div>
                 </div>
@@ -988,7 +1029,7 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
                 ${o.won ? '' : `<div class="consensus"><div class="cbar ${blocked ? 'blocked' : ''}"><i style="width:${blocked ? 100 : pct}%"></i></div>
                     <div class="clabel">${blocked ? `<b>${c.nos}</b> not keen — needs everyone in` : (c.ins === c.total ? 'everyone\'s in!' : `<b>${c.ins}/${c.total}</b> in · ${c.reacted < c.total ? (c.total - c.reacted) + ' to go' : 'needs everyone'}`)}</div></div>`}
                 ${o.won
-                    ? `<div class="won-foot"><span class="big">🎉</span><span>It's settled — enjoy!</span><a class="go" href="${maps}" target="_blank" rel="noopener">Directions</a></div>`
+                    ? `<div class="won-foot"><span class="big">🎉</span><span>It's settled — enjoy!</span><a class="go" href="${gdir}" target="_blank" rel="noopener">Directions</a></div>`
                     : `<div class="react">
                         <button class="rb in ${my === 'in' ? 'sel' : ''}" data-r="in" data-id="${o.id}"><span class="e">😋</span>I'm in</button>
                         <button class="rb ok ${my === 'ok' ? 'sel' : ''}" data-r="ok" data-id="${o.id}"><span class="e">🤔</span>Meh</button>
