@@ -1,1697 +1,1106 @@
 <!-- ===================================================================
-     MatchMeal — a peer-to-peer "where shall we eat?" negotiator.
-     Two (or more) people connect over a real WebRTC data channel. Each
-     person keeps their own dining preferences ON THEIR OWN DEVICE. A
-     local LLM (Chrome built-in Prompt API, falling back to on-device
-     Gemma via LiteRT/WebGPU) acts as each person's food concierge:
-     it searches the real world for nearby restaurants (OpenStreetMap),
-     proposes options, and — crucially — answers other people's agents
-     on their owner's behalf ("is this place ok? any concerns?"). The
-     organiser keeps proposing until everyone's agent is satisfied.
-     Nothing leaves your device except the verdicts you choose to share.
+     MatchMeal — Table (v2)
+     A ground-up, mobile-first redesign of the MatchMeal experience.
+     • Minimalist, share-first, onboarding in seconds.
+     • AI is OPTIONAL: Chrome's built-in Prompt API can represent a user
+       automatically; everyone else simply shares their preferences and
+       taps — no model, no download, fully usable on a low-end phone.
+     • Everyone's preferences reach the whole table, so whoever searches
+       considers the WHOLE group. Options are ranked by the group's rating,
+       and a place is locked in only when EVERY member is in.
 
      Copyright (c) 2026 woodyhoko. All Rights Reserved.
      This source is provided for viewing only. No license is granted to use,
-     copy, modify, distribute, host, or create derivative works of any part of
-     it without the prior express written permission of the copyright holder.
-     See the LICENSE file. Do not remove this notice.
+     copy, modify, distribute, host, or create derivative works of any part
+     of it without the prior express written permission of the copyright
+     holder. See the LICENSE file. Do not remove this notice.
      ================================================================== -->
 <!doctype html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>MatchMeal — Find a table everyone loves</title>
-    <meta name="description"
-        content="A peer-to-peer dining matchmaker. Connect to friends over WebRTC, keep your taste profile on-device, and let each person's on-device AI negotiate the perfect restaurant for the whole table." />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
+    <meta name="theme-color" content="#fff7f0" />
+    <title>MatchMeal — pick a place, together</title>
+    <meta name="description" content="Decide where to eat, together. Share a link, everyone adds their taste, and MatchMeal finds the place the whole table loves." />
     <meta name="author" content="woodyhoko" />
     <meta name="copyright" content="Copyright (c) 2026 woodyhoko. All Rights Reserved." />
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-        rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
-        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
     <style>
         :root {
-            --bg: #160f0c;
-            --surface: #221813;
-            --surface-2: #2d201a;
-            --surface-hover: #3a2a21;
-            --primary: #ff7a4d;
-            --primary-soft: rgba(255, 122, 77, .15);
-            --amber: #ffb454;
-            --amber-soft: rgba(255, 180, 84, .15);
-            --berry: #e85d8c;
-            --berry-soft: rgba(232, 93, 140, .15);
-            --ok: #57c98a;
-            --ok-soft: rgba(87, 201, 138, .16);
-            --warn: #f0a040;
-            --warn-soft: rgba(240, 160, 64, .16);
-            --bad: #f06464;
-            --bad-soft: rgba(240, 100, 100, .16);
-            --ink: #fbf1e9;
-            --muted: #c2a999;
-            --faint: #9a8073;
-            --line: rgba(255, 230, 210, .1);
-            --glass: rgba(34, 24, 19, .72);
-            --glass-border: rgba(255, 230, 210, .11);
-            --font: 'Outfit', system-ui, sans-serif;
-            --head: 'Fraunces', Georgia, serif;
-            --mono: 'JetBrains Mono', ui-monospace, monospace;
+            --bg: #fff7f0;
+            --bg-2: #ffeede;
+            --card: #ffffff;
+            --ink: #211611;
+            --ink-2: #5d4f46;
+            --muted: #948578;
+            --faint: #c9bcb0;
+            --line: #f1e6da;
+            --line-2: #ece0d3;
+            --accent: #ff5a36;
+            --accent-press: #ec4322;
+            --accent-soft: #fff0eb;
+            --amber: #ff9e2c;
+            --green: #16b866;
+            --green-soft: #e7f8ef;
+            --yellow: #f5a524;
+            --yellow-soft: #fdf2dd;
+            --red: #f0506a;
+            --red-soft: #fdebee;
+            --shadow-sm: 0 2px 8px rgba(80, 40, 20, .06);
+            --shadow: 0 12px 34px rgba(120, 60, 30, .12);
+            --shadow-lg: 0 24px 60px rgba(120, 60, 30, .2);
+            --r: 22px;
+            --r-sm: 14px;
+            --font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+            --ease: cubic-bezier(.22, 1, .36, 1);
+            --shell: 480px;
         }
 
-        * { box-sizing: border-box; }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #17110d; --bg-2: #1f1611; --card: #241a14; --ink: #f7ede4; --ink-2: #d8c6b8;
+                --muted: #ab9889; --faint: #6f5f53; --line: #34271f; --line-2: #3d2e25;
+                --accent-soft: #36211a; --green-soft: #14271d; --yellow-soft: #2b2113; --red-soft: #301a1d;
+                --shadow-sm: 0 2px 8px rgba(0,0,0,.3); --shadow: 0 12px 34px rgba(0,0,0,.45); --shadow-lg: 0 24px 60px rgba(0,0,0,.55);
+            }
+        }
 
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { margin: 0; height: 100%; }
         body {
-            margin: 0;
-            min-height: 100vh;
             background: var(--bg);
-            background-image:
-                radial-gradient(circle at 12% 8%, rgba(255, 122, 77, .14) 0%, transparent 44%),
-                radial-gradient(circle at 88% 12%, rgba(255, 180, 84, .12) 0%, transparent 42%),
-                radial-gradient(circle at 50% 116%, rgba(232, 93, 140, .12) 0%, transparent 54%);
             color: var(--ink);
             font-family: var(--font);
             -webkit-font-smoothing: antialiased;
+            overscroll-behavior-y: none;
+        }
+        body::before {
+            content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+            background:
+                radial-gradient(60vw 50vh at 80% -10%, rgba(255, 158, 44, .18), transparent 60%),
+                radial-gradient(70vw 50vh at -10% 0%, rgba(255, 90, 54, .14), transparent 55%),
+                radial-gradient(80vw 60vh at 50% 120%, rgba(255, 90, 54, .1), transparent 60%);
         }
 
+        button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+        input, textarea, select { font-family: inherit; }
+        a { color: var(--accent); }
+        .ic { width: 1.25em; height: 1.25em; display: inline-block; vertical-align: -.18em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        /* ---------------- App shell (phone-sized, centered) ---------------- */
+        #shell {
+            width: 100%; max-width: var(--shell); margin: 0 auto; min-height: 100dvh;
+            display: flex; flex-direction: column; position: relative;
+            padding: 0 16px calc(env(safe-area-inset-bottom) + 18px);
+        }
+        @media (min-width: 540px) {
+            #shell { box-shadow: var(--shadow-lg); background: var(--bg); border-radius: 34px; margin-top: 20px; margin-bottom: 20px; min-height: calc(100dvh - 40px); overflow: hidden; padding-bottom: 22px; }
+            body { padding: 0; }
+        }
+
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes slideUp { from { transform: translateY(14px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
-        @keyframes pulse { 0% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.7); opacity: 0 } 100% { transform: scale(1); opacity: 0 } }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes pop { 0% { transform: scale(.6); opacity: 0 } 60% { transform: scale(1.08) } 100% { transform: scale(1); opacity: 1 } }
+        @keyframes pop { 0% { transform: scale(.8); opacity: 0 } 60% { transform: scale(1.06) } 100% { transform: scale(1); opacity: 1 } }
+        @keyframes sheetUp { from { transform: translateY(102%); } to { transform: translateY(0); } }
+        @keyframes spin { to { transform: rotate(360deg) } }
+        @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.9); opacity: 0 } }
+        @keyframes shimmer { 100% { background-position: 200% 0 } }
+        @keyframes bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-7px) } }
 
-        a { color: var(--amber); }
+        .view { animation: fadeUp .5s var(--ease) both; }
 
-        /* ---------- Loader / model gate ---------- */
-        .loader-overlay {
-            position: fixed; inset: 0; z-index: 2000;
-            display: flex; align-items: center; justify-content: center;
-            background: var(--bg);
-            background-image:
-                radial-gradient(circle at 22% 22%, rgba(255, 122, 77, .18) 0, transparent 45%),
-                radial-gradient(circle at 78% 80%, rgba(255, 180, 84, .15) 0, transparent 45%);
-            padding: 24px;
-        }
-        .gate { text-align: center; max-width: 520px; animation: fadeIn .8s ease-out; }
-        .gate .logo { font-size: 3.4rem; line-height: 1; margin-bottom: 10px; filter: drop-shadow(0 8px 18px rgba(255,122,77,.4)); }
-        .gate .kicker { text-transform: uppercase; letter-spacing: .34em; font-size: .72rem; color: var(--muted); margin-bottom: 12px; }
-        .gate h1 {
-            font-family: var(--head); font-weight: 700; font-size: 3.1rem; margin: 0 0 .4rem; letter-spacing: -.01em;
-            background: linear-gradient(110deg, var(--primary), var(--amber) 60%, var(--berry));
-            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-        }
-        .gate .lede { color: var(--muted); font-size: 1.04rem; line-height: 1.6; margin: 0 auto 22px; max-width: 440px; }
-        .gate-note { font-size: .94rem; line-height: 1.55; color: var(--muted); margin: 18px auto 0; max-width: 450px; }
-        .gate-sub { font-size: .76rem; line-height: 1.5; color: var(--faint); margin-top: 14px; }
-
-        .backend-chip {
-            display: inline-flex; align-items: center; gap: 8px;
-            padding: 7px 15px; border-radius: 999px; font-size: .82rem; font-weight: 500;
-            background: var(--surface-2); border: 1px solid var(--line); margin-bottom: 20px;
-        }
-        .backend-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
-        .backend-chip.ok .dot { background: var(--ok); box-shadow: 0 0 10px var(--ok); }
-        .backend-chip.gemma .dot { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
-
-        .progress-bar { width: 320px; max-width: 80vw; height: 6px; background: var(--surface); border-radius: 3px; margin: 22px auto 0; overflow: hidden; }
-        .progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--primary), var(--amber)); transition: width .3s ease; }
-
-        /* ---------- Buttons ---------- */
+        /* ---------------- Buttons ---------------- */
         .btn {
-            font-family: var(--font); font-size: .92rem; font-weight: 600;
-            border: none; border-radius: 12px; padding: 11px 20px; cursor: pointer;
-            color: #2a1206; background: linear-gradient(120deg, var(--primary), var(--amber));
-            transition: transform .15s, box-shadow .15s, opacity .15s;
-            box-shadow: 0 8px 22px rgba(255, 122, 77, .28);
+            display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+            font-size: 1.02rem; font-weight: 700; letter-spacing: -.01em;
+            background: var(--accent); color: #fff; border-radius: 16px; padding: 15px 22px;
+            box-shadow: 0 10px 24px rgba(255, 90, 54, .32); transition: transform .12s var(--ease), box-shadow .2s, background .15s;
         }
-        .btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(255, 122, 77, .38); }
-        .btn:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
-        .btn-ghost { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line); box-shadow: none; }
-        .btn-ghost:hover:not(:disabled) { background: var(--surface-hover); transform: translateY(-1px); box-shadow: none; }
-        .btn-sm { padding: 8px 13px; font-size: .8rem; border-radius: 10px; }
-        .btn-block { width: 100%; }
-        .icon-btn {
-            background: var(--surface-2); border: 1px solid var(--line); color: var(--muted);
-            width: 32px; height: 32px; border-radius: 9px; cursor: pointer; display: inline-flex;
-            align-items: center; justify-content: center; transition: .15s; flex: 0 0 auto;
+        .btn:active { transform: scale(.96); background: var(--accent-press); }
+        .btn:disabled { opacity: .5; box-shadow: none; }
+        .btn.block { width: 100%; }
+        .btn.lg { padding: 17px 24px; font-size: 1.08rem; border-radius: 18px; }
+        .btn.ghost { background: var(--card); color: var(--ink); box-shadow: var(--shadow-sm); border: 1px solid var(--line); }
+        .btn.ghost:active { background: var(--bg-2); }
+        .btn.soft { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
+        .btn.soft:active { background: #ffe2d8; }
+        .iconbtn {
+            width: 44px; height: 44px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center;
+            background: var(--card); color: var(--ink-2); box-shadow: var(--shadow-sm); border: 1px solid var(--line); transition: transform .12s, background .15s; flex: 0 0 auto;
         }
-        .icon-btn:hover { background: var(--surface-hover); color: var(--ink); }
+        .iconbtn:active { transform: scale(.92); background: var(--bg-2); }
 
-        /* ---------- App shell ---------- */
-        .app { max-width: 1420px; margin: 0 auto; padding: 18px clamp(12px, 3vw, 28px) 90px; animation: fadeIn .6s ease-out; }
-        header.top {
-            display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-            padding: 12px 18px; margin-bottom: 18px;
-            background: var(--glass); border: 1px solid var(--glass-border); border-radius: 16px; backdrop-filter: blur(12px);
-        }
-        .brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
-        .brand .mark { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; background: linear-gradient(135deg, var(--primary), var(--berry)); font-size: 1.3rem; box-shadow: 0 6px 16px rgba(255,122,77,.35); }
-        .brand h1 { font-family: var(--head); font-size: 1.4rem; margin: 0; line-height: 1.05; font-weight: 700; letter-spacing: -.01em; }
-        .brand p { margin: 2px 0 0; font-size: .76rem; color: var(--muted); }
-        .top .backend-chip { margin: 0; }
-        .mesh-stat {
-            display: inline-flex; align-items: center; gap: 8px; font-size: .82rem; font-weight: 600;
-            padding: 7px 14px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line);
-        }
-        .mesh-stat .live { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); position: relative; }
-        .mesh-stat.online .live { background: var(--ok); }
-        .mesh-stat.online .live::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; background: var(--ok); animation: pulse 1.8s ease-out infinite; }
+        /* ---------------- Onboarding ---------------- */
+        .ob { flex: 1; display: flex; flex-direction: column; padding-top: calc(env(safe-area-inset-top) + 8px); }
+        .ob-top { display: flex; align-items: center; gap: 10px; padding: 14px 2px 4px; min-height: 56px; }
+        .ob-back { color: var(--muted); display: none; }
+        .ob-back.show { display: inline-flex; }
+        .progress-dots { display: flex; gap: 7px; margin-left: auto; margin-right: auto; }
+        .progress-dots i { width: 7px; height: 7px; border-radius: 4px; background: var(--line-2); transition: .3s var(--ease); }
+        .progress-dots i.on { width: 22px; background: var(--accent); }
+        .ob-body { flex: 1; display: flex; flex-direction: column; padding: 8px 2px 0; }
+        .hero-emoji { font-size: 4.6rem; line-height: 1; animation: bob 3.5s ease-in-out infinite; filter: drop-shadow(0 12px 22px rgba(255,90,54,.32)); }
+        .ob h1 { font-size: 2.05rem; font-weight: 800; letter-spacing: -.03em; margin: 18px 0 8px; line-height: 1.08; }
+        .ob p.sub { color: var(--ink-2); font-size: 1.05rem; line-height: 1.5; margin: 0 0 22px; max-width: 30ch; }
+        .ob-foot { padding: 14px 2px calc(env(safe-area-inset-bottom) + 8px); }
 
-        /* ---------- Layout grid ---------- */
-        .grid { display: grid; grid-template-columns: 340px 1fr 350px; gap: 18px; align-items: start; }
-        .panel { background: var(--glass); border: 1px solid var(--glass-border); border-radius: 18px; padding: 18px; backdrop-filter: blur(12px); margin-bottom: 18px; }
-        .panel:last-child { margin-bottom: 0; }
-        .panel-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
-        .panel-head h2 { font-family: var(--head); font-size: 1.1rem; margin: 0; font-weight: 600; }
-        .panel-head .count { margin-left: auto; font-size: .74rem; color: var(--muted); background: var(--surface-2); padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); }
-        .panel-head .hbtns { margin-left: auto; display: flex; gap: 6px; }
-        .panel-sub { font-size: .8rem; color: var(--muted); margin: -6px 0 14px; line-height: 1.5; }
-
-        /* ---------- Fields ---------- */
-        .field { margin-bottom: 13px; }
-        .field label, .lbl { display: block; font-size: .72rem; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-        .field input[type=text], .field input[type=number], .field textarea, .field select,
-        .modal input[type=text], .modal input[type=number], .modal textarea, .modal select {
-            width: 100%; padding: 11px 13px; border-radius: 11px; font-size: .92rem; font-family: var(--font);
-            background: linear-gradient(180deg, rgba(15,9,6,.6), rgba(15,9,6,.25)); color: var(--ink); outline: none;
-            border: 1px solid var(--line); box-shadow: inset 0 1px 2px rgba(0,0,0,.3); transition: border-color .15s, box-shadow .15s, background .15s;
+        .field-label { font-size: .82rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 0 0 10px; }
+        .input {
+            width: 100%; background: var(--card); border: 1.5px solid var(--line-2); border-radius: 15px; padding: 15px 16px;
+            font-size: 1.05rem; color: var(--ink); outline: none; transition: border-color .15s, box-shadow .15s; box-shadow: var(--shadow-sm);
         }
-        .field input::placeholder, .field textarea::placeholder, .modal input::placeholder, .modal textarea::placeholder { color: rgba(194,169,153,.5); }
-        .field textarea, .modal textarea { resize: vertical; min-height: 56px; line-height: 1.5; }
-        .field input:focus, .field textarea:focus, .field select:focus,
-        .modal input:focus, .modal textarea:focus, .modal select:focus {
-            border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255, 122, 77, .18), inset 0 1px 2px rgba(0,0,0,.25);
-        }
-        select { -webkit-appearance: none; appearance: none; cursor: pointer;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23c2a999' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
-            background-repeat: no-repeat; background-position: right 13px center; padding-right: 32px !important;
-        }
-        select option { background: var(--surface); color: var(--ink); }
-        .field .mono { font-family: var(--mono); letter-spacing: .02em; }
-        .row2 { display: flex; gap: 10px; }
-        .row2 > * { flex: 1; }
-        input[type=checkbox] { -webkit-appearance: none; appearance: none; width: 17px; height: 17px; border-radius: 5px;
-            border: 1px solid var(--line); background: var(--surface); cursor: pointer; position: relative; flex: 0 0 auto; transition: .15s; vertical-align: -3px; }
-        input[type=checkbox]:checked { background: linear-gradient(135deg, var(--primary), var(--amber)); border-color: var(--primary); }
-        input[type=checkbox]:checked::after { content: '✓'; position: absolute; inset: 0; display: grid; place-items: center; font-size: .72rem; color: #2a1206; font-weight: 700; }
+        .input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+        .input::placeholder { color: var(--faint); }
 
-        /* ---------- Identity ---------- */
-        .id-card { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 13px; background: var(--surface); border: 1px solid var(--line); margin-bottom: 14px; }
-        .id-ava { width: 48px; height: 48px; border-radius: 13px; display: grid; place-items: center; font-size: 1.5rem; background: linear-gradient(135deg, var(--berry), var(--primary)); flex: 0 0 auto; }
-        .id-meta { min-width: 0; flex: 1; }
-        .id-meta .nm { font-weight: 700; font-size: 1rem; }
-        .id-meta .pid { font-family: var(--mono); font-size: .74rem; color: var(--muted); display: flex; align-items: center; gap: 6px; }
-        .id-meta .pid b { color: var(--amber); }
+        .emoji-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+        .emoji-pick { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; font-size: 1.5rem; background: var(--card); border: 1.5px solid var(--line-2); transition: transform .12s var(--ease), border-color .15s; }
+        .emoji-pick:active { transform: scale(.9); }
+        .emoji-pick.on { border-color: var(--accent); background: var(--accent-soft); transform: scale(1.06); }
 
-        /* ---------- Chips (taste) ---------- */
-        .chip-wrap { display: flex; flex-wrap: wrap; gap: 7px; }
+        .chips { display: flex; flex-wrap: wrap; gap: 9px; }
         .chip {
-            font-size: .8rem; font-weight: 500; padding: 6px 12px; border-radius: 999px; cursor: pointer;
-            background: var(--surface); border: 1px solid var(--line); color: var(--muted); transition: .12s; user-select: none;
-            display: inline-flex; align-items: center; gap: 6px;
+            display: inline-flex; align-items: center; gap: 7px; padding: 11px 15px; border-radius: 13px; font-size: .98rem; font-weight: 600;
+            background: var(--card); color: var(--ink-2); border: 1.5px solid var(--line-2); transition: transform .12s var(--ease), border-color .15s, background .15s, color .15s;
         }
-        .chip:hover { border-color: var(--faint); color: var(--ink); }
-        .chip.love { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
-        .chip.avoid { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); }
-        .chip.on { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
-        .chip .x { opacity: .7; font-size: .7rem; }
-        .chip-hint { font-size: .72rem; color: var(--faint); margin-top: 8px; line-height: 1.5; }
-
-        /* ---------- Rules ---------- */
-        .rule-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; padding-right: 4px; }
-        .rule-item { background: var(--surface); border: 1px solid var(--line); border-radius: 11px; padding: 9px 11px; border-left: 3px solid var(--bad); display: flex; gap: 9px; align-items: flex-start; }
-        .rule-item.conditional { border-left-color: var(--warn); }
-        .rule-item.prefer { border-left-color: var(--ok); }
-        .rule-item .ri-ico { font-size: .95rem; margin-top: 1px; }
-        .rule-item .ri-body { flex: 1; min-width: 0; }
-        .rule-item .ri-t { font-weight: 600; font-size: .85rem; word-break: break-word; }
-        .rule-item .ri-d { font-size: .75rem; color: var(--muted); line-height: 1.4; margin-top: 2px; }
-        .empty { text-align: center; color: var(--faint); font-size: .84rem; padding: 20px 10px; line-height: 1.5; }
-
-        /* ---------- Participants ---------- */
-        .peer-list { display: flex; flex-direction: column; gap: 9px; }
-        .peer-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 10px; }
-        .peer-card .pdot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); flex: 0 0 auto; }
-        .peer-card .pdot.relayed { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
-        .peer-card .pdot.self { background: var(--berry); box-shadow: 0 0 8px var(--berry); }
-        .peer-card .pe { font-size: 1.2rem; }
-        .peer-card .pmeta { min-width: 0; flex: 1; }
-        .peer-card .pmeta .pn { font-weight: 600; font-size: .88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .peer-card .pmeta .pi { font-family: var(--mono); font-size: .7rem; color: var(--faint); }
-        .peer-card .ptag { font-size: .62rem; color: var(--muted); border: 1px solid var(--line); padding: 2px 7px; border-radius: 999px; }
-
-        /* ---------- Concierge ---------- */
-        .concierge-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
-        .concierge-actions .btn { flex: 1; min-width: 150px; }
-        .composer {
-            display: flex; align-items: flex-end; gap: 10px; padding: 8px 8px 8px 14px; border-radius: 15px;
-            background: linear-gradient(180deg, rgba(15,9,6,.6), rgba(15,9,6,.25)); border: 1px solid var(--line);
-            box-shadow: inset 0 1px 3px rgba(0,0,0,.35); transition: border-color .15s, box-shadow .15s;
-        }
-        .composer:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(255,122,77,.16), inset 0 1px 3px rgba(0,0,0,.3); }
-        .composer textarea {
-            flex: 1; min-height: 24px; max-height: 140px; resize: none; border: none; outline: none; background: transparent;
-            color: var(--ink); font-family: var(--font); font-size: .95rem; line-height: 1.5; padding: 7px 0;
-        }
-        .composer textarea::placeholder { color: rgba(194,169,153,.5); }
-        .composer .send {
-            width: 42px; height: 42px; border-radius: 12px; border: none; cursor: pointer; flex: 0 0 auto;
-            background: linear-gradient(135deg, var(--primary), var(--amber)); color: #2a1206; font-size: 1rem;
-            display: grid; place-items: center; transition: transform .15s, box-shadow .15s; box-shadow: 0 6px 16px rgba(255,122,77,.3);
-        }
-        .composer .send:hover { transform: translateY(-2px) scale(1.03); box-shadow: 0 9px 20px rgba(255,122,77,.4); }
-        .loc-line { font-size: .76rem; color: var(--muted); margin-top: 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-        .loc-line a { cursor: pointer; }
-
-        /* ---------- Candidate cards ---------- */
-        .cand-list { display: flex; flex-direction: column; gap: 14px; }
-        .cand { border: 1px solid var(--line); border-radius: 16px; background: var(--surface); overflow: hidden; animation: slideUp .3s ease-out; }
-        .cand.finalized { border-color: var(--ok); box-shadow: 0 0 0 1px var(--ok), 0 12px 30px rgba(87,201,138,.18); }
-        .cand .c-head { padding: 14px 16px 12px; display: flex; gap: 12px; align-items: flex-start; }
-        .cand .c-ico { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; font-size: 1.4rem; background: linear-gradient(135deg, var(--amber-soft), var(--primary-soft)); border: 1px solid var(--line); flex: 0 0 auto; }
-        .cand .c-name { font-family: var(--head); font-weight: 600; font-size: 1.12rem; line-height: 1.2; }
-        .cand .c-meta { font-size: .76rem; color: var(--muted); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 5px 12px; }
-        .cand .c-by { font-size: .68rem; color: var(--faint); margin-top: 4px; }
-        .cand .c-pitch { padding: 0 16px 12px; font-size: .9rem; line-height: 1.55; color: var(--ink); }
-        .cand .c-pitch .q { color: var(--amber); font-style: italic; }
-        .cand .stances { padding: 0 16px 12px; display: flex; flex-wrap: wrap; gap: 8px; }
-        .stance {
-            display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px;
-            font-size: .76rem; font-weight: 600; border: 1px solid var(--line); background: var(--bg); position: relative;
-        }
-        .stance .se { font-size: .9rem; }
-        .stance.satisfied { border-color: var(--ok); color: var(--ok); background: var(--ok-soft); }
-        .stance.concern { border-color: var(--warn); color: var(--warn); background: var(--warn-soft); }
-        .stance.veto { border-color: var(--bad); color: var(--bad); background: var(--bad-soft); }
-        .stance.pending { color: var(--faint); }
-        .stance .tip {
-            display: none; position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%);
-            background: var(--surface-2); border: 1px solid var(--glass-border); border-radius: 9px; padding: 7px 10px;
-            font-size: .72rem; font-weight: 400; color: var(--ink); width: max-content; max-width: 220px; line-height: 1.4;
-            z-index: 5; box-shadow: 0 8px 22px rgba(0,0,0,.4); white-space: normal;
-        }
-        .stance:hover .tip { display: block; }
-        .cand .c-foot { padding: 11px 16px; background: var(--surface-2); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-        .cand .c-foot .grow { flex: 1; }
-        .final-banner { padding: 13px 16px; background: linear-gradient(120deg, var(--ok-soft), transparent); border-top: 1px solid var(--ok); display: flex; align-items: center; gap: 10px; font-weight: 600; color: var(--ok); animation: pop .4s ease-out; }
-        .final-banner .fb-emoji { font-size: 1.5rem; }
-
-        /* ---------- Activity feed ---------- */
-        .feed { display: flex; flex-direction: column; gap: 10px; max-height: 460px; overflow-y: auto; padding-right: 4px; }
-        .fe { display: flex; gap: 9px; animation: slideUp .25s ease-out; }
-        .fe .fa-ico { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; font-size: .8rem; flex: 0 0 auto; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
-        .fe .fa-body { flex: 1; min-width: 0; font-size: .85rem; line-height: 1.5; }
-        .fe .fa-who { font-weight: 600; font-size: .76rem; color: var(--amber); }
-        .fe .fa-time { font-size: .66rem; color: var(--faint); }
-        .fe.sys .fa-ico { background: var(--primary-soft); color: var(--primary); }
-        .fe.tool .fa-ico { background: var(--amber-soft); color: var(--amber); }
-        .fe.tool .fa-body code { font-family: var(--mono); font-size: .76rem; color: var(--amber); word-break: break-word; }
-        .fe.ask .fa-ico { background: var(--berry-soft); color: var(--berry); }
-        .fe.chat .fa-ico { background: var(--surface-hover); color: var(--ink); }
-        .fe .bubble { background: var(--surface); border: 1px solid var(--line); border-radius: 11px; padding: 8px 11px; margin-top: 3px; }
-
-        /* ---------- Tabs ---------- */
-        .tabs { display: flex; gap: 6px; margin-bottom: 14px; background: var(--surface); padding: 4px; border-radius: 12px; border: 1px solid var(--line); }
-        .tab { flex: 1; text-align: center; padding: 8px; border-radius: 9px; cursor: pointer; font-size: .82rem; font-weight: 600; color: var(--muted); transition: .15s; }
-        .tab:hover { color: var(--ink); }
-        .tab.active { background: var(--surface-2); color: var(--ink); }
-        .tab .badge { font-size: .62rem; background: var(--bad); color: #fff; border-radius: 999px; padding: 1px 6px; margin-left: 4px; }
-
-        /* ---------- Toast ---------- */
-        .toast-wrap { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 3000; display: flex; flex-direction: column; gap: 8px; align-items: center; }
-        .toast { background: var(--surface-2); border: 1px solid var(--glass-border); border-radius: 11px; padding: 10px 16px; font-size: .85rem; box-shadow: 0 12px 30px rgba(0,0,0,.4); animation: slideUp .25s ease-out; max-width: 90vw; }
-        .toast.ok { border-color: var(--ok); }
-        .toast.bad { border-color: var(--bad); }
-
-        /* ---------- Modal ---------- */
-        .modal-overlay { position: fixed; inset: 0; z-index: 1500; display: none; align-items: center; justify-content: center; background: rgba(10, 6, 4, .76); backdrop-filter: blur(8px); padding: 20px; animation: fadeIn .25s; }
-        .modal-overlay.show { display: flex; }
-        .modal { background: var(--surface); border: 1px solid var(--glass-border); border-radius: 18px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; animation: slideUp .3s ease-out; }
-        .modal-head { display: flex; align-items: center; gap: 12px; padding: 18px 20px 0; }
-        .modal-head h2 { font-family: var(--head); margin: 0; font-size: 1.25rem; font-weight: 600; }
-        .modal-head .icon-btn { margin-left: auto; }
-        .modal-body { padding: 16px 20px 20px; }
-        .modal-foot { display: flex; gap: 10px; margin-top: 6px; }
-        .modal-foot .btn { flex: 1; }
+        .chip:active { transform: scale(.94); }
+        .chip.love { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+        .chip.avoid { background: var(--red-soft); color: var(--red); border-color: var(--red); text-decoration: line-through; }
+        .chip.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+        .chip .e { font-size: 1.1rem; }
         .seg { display: flex; gap: 8px; }
-        .seg .opt { flex: 1; text-align: center; padding: 9px 8px; border-radius: 10px; cursor: pointer; background: var(--surface-2); border: 1px solid var(--line); font-size: .82rem; font-weight: 600; color: var(--muted); transition: .15s; }
-        .seg .opt.active { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
+        .seg .opt { flex: 1; text-align: center; padding: 13px 6px; border-radius: 14px; font-weight: 700; font-size: 1rem; background: var(--card); border: 1.5px solid var(--line-2); color: var(--ink-2); transition: .15s var(--ease); }
+        .seg .opt.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
 
-        .corner-links { position: fixed; bottom: 14px; right: 14px; z-index: 999; display: flex; gap: 8px; font-size: 12.5px; }
-        .corner-links a { background: var(--glass); color: var(--ink); border: 1px solid var(--glass-border); padding: 7px 13px; border-radius: 999px; text-decoration: none; backdrop-filter: blur(8px); transition: .15s; }
-        .corner-links a:hover { border-color: var(--amber); color: var(--amber); }
-
-        @media (max-width: 1180px) { .grid { grid-template-columns: 1fr; } .feed { max-height: 380px; } }
-        @media (max-width: 620px) {
-            .gate h1 { font-size: 2.3rem; }
-            .brand p { display: none; }
-            .app { padding-bottom: 80px; }
-            .concierge-actions .btn { min-width: 120px; }
-            .corner-links { display: none; }
+        .pick-card {
+            display: flex; gap: 14px; align-items: center; width: 100%; text-align: left;
+            background: var(--card); border: 1.5px solid var(--line-2); border-radius: 18px; padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-sm);
+            transition: transform .12s var(--ease), border-color .15s;
         }
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: var(--surface-hover); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: var(--faint); }
+        .pick-card:active { transform: scale(.98); }
+        .pick-card.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+        .pick-card .pc-ic { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-size: 1.5rem; background: var(--bg-2); flex: 0 0 auto; }
+        .pick-card .pc-t { font-weight: 700; font-size: 1.06rem; }
+        .pick-card .pc-d { color: var(--muted); font-size: .9rem; margin-top: 2px; line-height: 1.4; }
+        .pick-card .pc-check { margin-left: auto; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line-2); display: grid; place-items: center; color: #fff; flex: 0 0 auto; transition: .15s; }
+        .pick-card.on .pc-check { background: var(--accent); border-color: var(--accent); }
+        .pick-card:not(.on) .pc-check .ic { opacity: 0; }
+
+        /* ---------------- Top bar ---------------- */
+        .topbar { display: flex; align-items: center; gap: 12px; padding: calc(env(safe-area-inset-top) + 14px) 2px 12px; position: sticky; top: 0; z-index: 20; background: linear-gradient(var(--bg) 70%, transparent); }
+        .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; min-width: 0; }
+        .brand .logo { width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), var(--amber)); display: grid; place-items: center; font-size: 1.15rem; box-shadow: 0 6px 16px rgba(255,90,54,.35); flex: 0 0 auto; }
+        .brand .tt { font-weight: 800; font-size: 1.15rem; letter-spacing: -.02em; line-height: 1; }
+        .brand .ss { font-size: .74rem; color: var(--muted); margin-top: 2px; }
+
+        /* members row */
+        .members { display: flex; align-items: center; gap: 10px; padding: 4px 2px 14px; }
+        .ava-stack { display: flex; }
+        .ava { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-size: 1.15rem; background: var(--card); border: 2.5px solid var(--bg); box-shadow: var(--shadow-sm); margin-left: -10px; position: relative; }
+        .ava:first-child { margin-left: 0; }
+        .ava.me { background: linear-gradient(135deg, var(--accent-soft), #fff); }
+        .ava .dot { position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%; background: var(--green); border: 2px solid var(--bg); }
+        .ava .dot.off { background: var(--faint); }
+        .members .mcount { font-size: .9rem; color: var(--muted); font-weight: 600; }
+        .members .share-mini { margin-left: auto; }
+
+        /* status pill */
+        .statuspill { display: inline-flex; align-items: center; gap: 7px; font-size: .8rem; font-weight: 600; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; box-shadow: var(--shadow-sm); }
+        .statuspill .live { width: 7px; height: 7px; border-radius: 50%; background: var(--green); position: relative; }
+        .statuspill .live::after { content:''; position:absolute; inset:-3px; border-radius:50%; background: var(--green); animation: pulse 1.8s ease-out infinite; }
+        .statuspill.off .live { background: var(--faint); }
+        .statuspill.off .live::after { display: none; }
+
+        /* location bar */
+        .locbar { display: flex; align-items: center; gap: 8px; font-size: .88rem; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 11px 14px; box-shadow: var(--shadow-sm); margin-bottom: 14px; }
+        .locbar .ic { color: var(--accent); }
+        .locbar b { font-weight: 700; }
+        .locbar .chg { margin-left: auto; color: var(--accent); font-weight: 700; font-size: .85rem; }
+
+        /* primary find */
+        .find-wrap { margin-bottom: 18px; }
+        .find-hint { text-align: center; color: var(--muted); font-size: .86rem; margin-top: 9px; }
+
+        /* section title */
+        .sec-h { display: flex; align-items: baseline; gap: 8px; margin: 6px 2px 12px; }
+        .sec-h h2 { font-size: 1.18rem; font-weight: 800; letter-spacing: -.02em; margin: 0; }
+        .sec-h .n { font-size: .85rem; color: var(--muted); font-weight: 600; margin-left: auto; }
+
+        /* option cards */
+        #board { position: relative; }
+        .opt {
+            background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; margin-bottom: 14px; box-shadow: var(--shadow-sm);
+            transition: transform .45s var(--ease), box-shadow .25s, border-color .25s; animation: fadeUp .45s var(--ease) both; will-change: transform;
+        }
+        .opt.top { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow); }
+        .opt.won { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-soft), var(--shadow); }
+        .opt-head { display: flex; gap: 13px; align-items: flex-start; }
+        .opt-ic { width: 50px; height: 50px; border-radius: 15px; display: grid; place-items: center; font-size: 1.6rem; flex: 0 0 auto; background: linear-gradient(135deg, var(--bg-2), #fff); position: relative; }
+        .opt.top .rankbadge, .opt.won .rankbadge { position: absolute; top: -8px; left: -8px; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; font-size: .7rem; font-weight: 800; display: grid; place-items: center; box-shadow: var(--shadow-sm); }
+        .opt.won .rankbadge { background: var(--green); }
+        .opt-tt { font-weight: 800; font-size: 1.12rem; letter-spacing: -.01em; line-height: 1.18; }
+        .opt-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: .85rem; margin-top: 4px; }
+        .opt-meta a { color: var(--muted); text-decoration: none; }
+        .opt-meta .ic { width: 1em; height: 1em; vertical-align: -.12em; }
+        .opt-pitch { font-size: .92rem; color: var(--ink-2); line-height: 1.5; margin: 11px 0 0; }
+
+        /* reactions tally */
+        .tally { display: flex; align-items: center; gap: 8px; margin-top: 13px; flex-wrap: wrap; }
+        .tally .who { display: inline-flex; align-items: center; gap: 4px; background: var(--bg-2); border-radius: 999px; padding: 4px 9px 4px 5px; font-size: .82rem; font-weight: 600; color: var(--ink-2); }
+        .tally .who .fe { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: .95rem; background: var(--card); }
+        .tally .who.in { background: var(--green-soft); color: var(--green); }
+        .tally .who.ok { background: var(--yellow-soft); color: #b9791a; }
+        .tally .who.no { background: var(--red-soft); color: var(--red); }
+        .tally .who.pending { opacity: .65; }
+
+        /* consensus bar */
+        .consensus { margin-top: 13px; }
+        .cbar { height: 8px; border-radius: 6px; background: var(--line); overflow: hidden; }
+        .cbar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--green), #5fe0a0); border-radius: 6px; transition: width .5s var(--ease); }
+        .cbar.blocked > i { background: linear-gradient(90deg, var(--red), #ff8aa0); }
+        .clabel { font-size: .82rem; color: var(--muted); margin-top: 7px; font-weight: 600; }
+        .clabel b { color: var(--ink-2); }
+
+        /* my reaction buttons */
+        .react { display: flex; gap: 8px; margin-top: 14px; }
+        .react .rb {
+            flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 11px 4px; border-radius: 14px;
+            background: var(--bg-2); border: 1.5px solid transparent; font-weight: 700; font-size: .78rem; color: var(--ink-2);
+            transition: transform .12s var(--ease), background .15s, border-color .15s; position: relative;
+        }
+        .react .rb .e { font-size: 1.35rem; transition: transform .15s var(--ease); }
+        .react .rb:active { transform: scale(.93); }
+        .react .rb.sel.in { background: var(--green-soft); border-color: var(--green); color: var(--green); }
+        .react .rb.sel.ok { background: var(--yellow-soft); border-color: var(--yellow); color: #b9791a; }
+        .react .rb.sel.no { background: var(--red-soft); border-color: var(--red); color: var(--red); }
+        .react .rb.sel .e { transform: scale(1.18); }
+        .react .rb .ai { position: absolute; top: 4px; right: 6px; font-size: .62rem; opacity: .7; }
+        .won-foot { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 13px 14px; border-radius: 16px; background: var(--green-soft); color: var(--green); font-weight: 800; animation: pop .4s var(--ease); }
+        .won-foot .big { font-size: 1.5rem; }
+        .won-foot .go { margin-left: auto; background: var(--green); color: #fff; border-radius: 12px; padding: 9px 14px; font-weight: 700; font-size: .9rem; }
+
+        /* empty / skeleton */
+        .empty { text-align: center; color: var(--muted); padding: 30px 20px; line-height: 1.55; animation: fadeIn .4s; }
+        .empty .be { font-size: 2.6rem; display: block; margin-bottom: 10px; animation: bob 3.5s ease-in-out infinite; }
+        .skel { height: 132px; border-radius: var(--r); margin-bottom: 14px; background: linear-gradient(100deg, var(--card) 30%, var(--bg-2) 50%, var(--card) 70%); background-size: 200% 100%; animation: shimmer 1.3s linear infinite; border: 1px solid var(--line); }
+
+        /* ---------------- Sheets (bottom) ---------------- */
+        .scrim { position: fixed; inset: 0; z-index: 60; background: rgba(30, 16, 8, .42); backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity .3s; }
+        .scrim.show { opacity: 1; pointer-events: auto; }
+        .sheet {
+            position: fixed; left: 50%; transform: translateX(-50%) translateY(102%); bottom: 0; z-index: 61; width: 100%; max-width: var(--shell);
+            background: var(--card); border-radius: 26px 26px 0 0; box-shadow: var(--shadow-lg); padding: 10px 18px calc(env(safe-area-inset-bottom) + 20px);
+            max-height: 90dvh; overflow-y: auto; transition: transform .42s var(--ease);
+        }
+        .sheet.show { transform: translateX(-50%) translateY(0); animation: sheetUp .42s var(--ease); }
+        .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line-2); margin: 6px auto 14px; }
+        .sheet h3 { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; margin: 0 0 4px; }
+        .sheet .sub { color: var(--ink-2); font-size: .96rem; line-height: 1.5; margin: 0 0 18px; }
+        .row { display: flex; gap: 10px; }
+        .row > * { flex: 1; }
+        .toggle-row { display: flex; align-items: center; gap: 14px; padding: 15px 0; border-top: 1px solid var(--line); }
+        .toggle-row:first-of-type { border-top: none; }
+        .toggle-row .tx { flex: 1; }
+        .toggle-row .tx .tt { font-weight: 700; font-size: 1rem; }
+        .toggle-row .tx .td { color: var(--muted); font-size: .85rem; margin-top: 2px; line-height: 1.4; }
+        .switch { width: 52px; height: 31px; border-radius: 999px; background: var(--line-2); position: relative; transition: background .2s; flex: 0 0 auto; }
+        .switch.on { background: var(--green); }
+        .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 25px; height: 25px; border-radius: 50%; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,.2); transition: transform .22s var(--ease); }
+        .switch.on::after { transform: translateX(21px); }
+        .switch.dis { opacity: .45; }
+
+        /* share sheet */
+        .qrbox { display: grid; place-items: center; padding: 18px; background: #fff; border-radius: 18px; margin: 4px auto 16px; width: max-content; box-shadow: var(--shadow-sm); }
+        .qrbox img, .qrbox canvas { display: block; border-radius: 6px; }
+        .linkbox { display: flex; align-items: center; gap: 10px; background: var(--bg-2); border-radius: 14px; padding: 13px 15px; margin-bottom: 14px; }
+        .linkbox .lk { flex: 1; font-size: .9rem; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+
+        /* toast */
+        #toasts { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 22px); z-index: 90; display: flex; flex-direction: column; gap: 8px; align-items: center; width: max-content; max-width: 92vw; }
+        .toast { background: var(--ink); color: var(--bg); font-size: .9rem; font-weight: 600; padding: 12px 18px; border-radius: 14px; box-shadow: var(--shadow-lg); animation: fadeUp .3s var(--ease); }
+        .toast.good { background: var(--green); color: #fff; }
+        .toast.bad { background: var(--red); color: #fff; }
+
+        /* match celebration */
+        #celebrate { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,12,7,.5); backdrop-filter: blur(5px); }
+        #celebrate.show { display: flex; animation: fadeIn .3s; }
+        .cele-card { background: var(--card); border-radius: 28px; box-shadow: var(--shadow-lg); padding: 30px 26px; text-align: center; max-width: 360px; width: 100%; animation: pop .5s var(--ease); }
+        .cele-card .cc-e { font-size: 4rem; animation: bob 2s ease-in-out infinite; }
+        .cele-card h2 { font-size: 1.7rem; font-weight: 800; letter-spacing: -.02em; margin: 12px 0 4px; }
+        .cele-card .cc-name { font-size: 1.25rem; font-weight: 800; color: var(--accent); margin: 6px 0; }
+        .cele-card .cc-sub { color: var(--ink-2); font-size: .95rem; line-height: 1.5; margin: 6px 0 20px; }
+        #confetti { position: fixed; inset: 0; z-index: 79; pointer-events: none; display: none; }
+        #confetti.show { display: block; }
+
+        .footnote { text-align: center; color: var(--faint); font-size: .72rem; padding: 18px 0 4px; }
+        .footnote a { color: var(--faint); text-decoration: none; }
+        ::-webkit-scrollbar { width: 0; height: 0; }
     </style>
 </head>
 
 <body>
-    <!-- ============ Loader / model gate ============ -->
-    <div id="loader" class="loader-overlay">
-        <div class="gate">
-            <div class="logo">🍽️</div>
-            <div class="kicker">Peer-to-peer dining matchmaker</div>
-            <h1>MatchMeal</h1>
-            <p class="lede">Connect to your friends over a direct WebRTC link. Everyone keeps their taste on their own
-                device, and each person's on-device AI negotiates until the whole table is happy with one restaurant.</p>
+    <canvas id="confetti"></canvas>
+    <div id="shell"></div>
 
-            <div id="backend-chip" class="backend-chip"><span class="dot"></span><span id="backend-label">Detecting on-device AI…</span></div>
+    <!-- scrim + sheets injected/toggled by JS -->
+    <div class="scrim" id="scrim"></div>
 
-            <div id="gate-action" style="display:none;">
-                <p id="gate-note" class="gate-note"></p>
-                <button id="enter-btn" class="btn"><i class="fa-solid fa-utensils"></i>&nbsp; Open MatchMeal</button>
-                <p id="gate-sub" class="gate-sub"></p>
-            </div>
-
-            <div id="gate-loading" style="display:none;">
-                <p id="loader-message" class="gate-note">Loading…</p>
-                <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
-            </div>
+    <!-- Share sheet -->
+    <div class="sheet" id="sheet-share">
+        <div class="grab"></div>
+        <h3>Invite the table</h3>
+        <p class="sub">Send this link. Whoever opens it joins instantly — no app, no sign-up.</p>
+        <div class="qrbox" id="qrbox"></div>
+        <div class="linkbox"><span class="lk" id="share-link">…</span></div>
+        <div class="row">
+            <button class="btn block" id="share-native"><svg class="ic" viewBox="0 0 24 24"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V4"/><path d="m8 8 4-4 4 4"/></svg> Share</button>
+            <button class="btn ghost block" id="share-copy"><svg class="ic" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg> Copy</button>
         </div>
     </div>
 
-    <!-- ============ App ============ -->
-    <div class="app" id="app" style="display:none;">
-        <header class="top">
-            <div class="brand">
-                <div class="mark">🍽️</div>
-                <div>
-                    <h1>MatchMeal</h1>
-                    <p>find a table everyone loves</p>
-                </div>
-            </div>
-            <div id="mesh-stat" class="mesh-stat"><span class="live"></span><span id="mesh-stat-label">Offline</span></div>
-            <div id="top-backend" class="backend-chip"><span class="dot"></span><span id="top-backend-label">—</span></div>
-        </header>
+    <!-- Settings sheet -->
+    <div class="sheet" id="sheet-settings">
+        <div class="grab"></div>
+        <h3>Your settings</h3>
+        <p class="sub">Choose how you join the decision. Everything stays on your device.</p>
+        <div class="toggle-row">
+            <div class="tx"><div class="tt">Let AI represent me <span id="ai-badge" style="font-size:.7rem;color:var(--muted)"></span></div><div class="td" id="ai-desc">Your on-device AI reacts to options for you.</div></div>
+            <div class="switch" id="sw-ai"></div>
+        </div>
+        <div class="toggle-row">
+            <div class="tx"><div class="tt">Auto-respond to new options</div><div class="td">React automatically from your taste the moment an option is proposed.</div></div>
+            <div class="switch" id="sw-auto"></div>
+        </div>
+        <button class="btn ghost block" id="edit-taste" style="margin-top:18px"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Edit my taste</button>
+        <button class="btn soft block" id="leave-table" style="margin-top:10px">Start a fresh table</button>
+        <div class="footnote">MatchMeal · © 2026 woodyhoko</div>
+    </div>
 
-        <div class="grid">
-            <!-- ============ LEFT: identity + connect + taste + rules ============ -->
-            <div>
-                <div class="panel">
-                    <div class="panel-head"><h2>You</h2></div>
-                    <div class="id-card">
-                        <div class="id-ava" id="id-ava">🙂</div>
-                        <div class="id-meta">
-                            <div class="nm" id="id-name">—</div>
-                            <div class="pid">id <b id="id-pid">connecting…</b>
-                                <button class="icon-btn" id="copy-id" title="Copy your id" style="width:24px;height:24px;font-size:.7rem"><i class="fa-solid fa-copy"></i></button>
-                            </div>
-                        </div>
-                        <button class="icon-btn" id="edit-profile" title="Edit name & emoji"><i class="fa-solid fa-pen"></i></button>
-                    </div>
+    <!-- Taste sheet (edit later) -->
+    <div class="sheet" id="sheet-taste">
+        <div class="grab"></div>
+        <h3>Your taste</h3>
+        <p class="sub">Tap once to love, twice to avoid. This is shared with your table so the search fits everyone.</p>
+        <div class="field-label">Cuisines</div>
+        <div class="chips" id="taste-cuisines" style="margin-bottom:18px"></div>
+        <div class="field-label">Dietary</div>
+        <div class="chips" id="taste-diet" style="margin-bottom:18px"></div>
+        <div class="field-label">Budget</div>
+        <div class="seg" id="taste-budget" style="margin-bottom:18px"></div>
+        <div class="field-label">How far?</div>
+        <div class="seg" id="taste-radius" style="margin-bottom:8px"></div>
+        <button class="btn block" id="taste-save" style="margin-top:18px">Save</button>
+    </div>
 
-                    <div class="field" style="margin-bottom:8px">
-                        <label>Invite a friend — share your link or id</label>
-                        <div class="row2">
-                            <button class="btn btn-sm btn-block" id="share-btn"><i class="fa-solid fa-link"></i> Copy invite link</button>
-                        </div>
-                    </div>
-                    <div class="field" style="margin-bottom:8px">
-                        <label>Join a friend — paste their id</label>
-                        <div class="row2">
-                            <input type="text" id="join-id" class="mono" placeholder="e.g. meal-AB12CD" />
-                            <button class="btn btn-sm" id="join-btn" style="flex:0 0 auto"><i class="fa-solid fa-plug"></i></button>
-                        </div>
-                    </div>
-                    <label style="display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--muted);cursor:pointer">
-                        <input type="checkbox" id="role-host" checked /> Stay reachable so others can join me (host)
-                    </label>
-                </div>
+    <!-- Location sheet -->
+    <div class="sheet" id="sheet-loc">
+        <div class="grab"></div>
+        <h3>Where are you?</h3>
+        <p class="sub">We use this to find real places nearby. It never leaves your device.</p>
+        <button class="btn block" id="loc-gps" style="margin-bottom:14px"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> Use my current location</button>
+        <div class="field-label">Or type a place</div>
+        <div class="row" style="margin-bottom:8px">
+            <input class="input" id="loc-q" placeholder="e.g. Shibuya, Tokyo" style="flex:3" />
+            <button class="btn ghost" id="loc-find" style="flex:1">Find</button>
+        </div>
+        <div id="loc-result" style="margin-top:8px"></div>
+    </div>
 
-                <div class="panel">
-                    <div class="panel-head">
-                        <h2>Your taste</h2>
-                        <div class="hbtns">
-                            <button class="icon-btn" id="export-btn" title="Export preferences"><i class="fa-solid fa-file-export"></i></button>
-                            <button class="icon-btn" id="import-btn" title="Import preferences"><i class="fa-solid fa-file-import"></i></button>
-                        </div>
-                    </div>
-                    <p class="panel-sub">Tap a cuisine once for <b style="color:var(--ok)">love</b>, twice to <b style="color:var(--bad)">avoid</b>, again to clear. Stored only on your device.</p>
-                    <div class="chip-wrap" id="cuisine-chips"></div>
-                    <button class="btn btn-sm btn-ghost" id="add-cuisine" style="margin-top:10px"><i class="fa-solid fa-plus"></i> Add cuisine</button>
+    <div id="toasts"></div>
 
-                    <label class="lbl" style="margin-top:16px">Dietary needs</label>
-                    <div class="chip-wrap" id="diet-chips"></div>
-
-                    <div class="row2" style="margin-top:14px">
-                        <div class="field" style="margin-bottom:0">
-                            <label>Budget (max)</label>
-                            <select id="budget">
-                                <option value="$">$ — cheap eats</option>
-                                <option value="$$" selected>$$ — moderate</option>
-                                <option value="$$$">$$$ — pricey</option>
-                                <option value="$$$$">$$$$ — splurge</option>
-                            </select>
-                        </div>
-                        <div class="field" style="margin-bottom:0">
-                            <label>Max distance</label>
-                            <select id="radius">
-                                <option value="800">Walk · 800 m</option>
-                                <option value="1500" selected>Near · 1.5 km</option>
-                                <option value="4000">Drive · 4 km</option>
-                                <option value="10000">Far · 10 km</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="field" style="margin-top:12px;margin-bottom:0">
-                        <label>Anything else your AI should know</label>
-                        <textarea id="notes" placeholder="e.g. I love patios, hate loud places, and I'm trying to eat less red meat."></textarea>
-                    </div>
-                </div>
-
-                <div class="panel">
-                    <div class="panel-head">
-                        <h2>Avoid & conditions</h2>
-                        <span class="count" id="rule-count">0</span>
-                    </div>
-                    <p class="panel-sub">Places to never suggest, or to allow only under a condition. Your AI checks these before agreeing to anything.</p>
-                    <div class="rule-list" id="rule-list"></div>
-                    <button class="btn btn-sm btn-ghost btn-block" id="add-rule" style="margin-top:12px"><i class="fa-solid fa-ban"></i> Add a rule</button>
-                </div>
-            </div>
-
-            <!-- ============ CENTER: concierge + candidates ============ -->
-            <div>
-                <div class="panel">
-                    <div class="panel-head"><h2>Your concierge</h2></div>
-                    <p class="panel-sub">Tell your on-device AI what you fancy, or just let it search nearby. It uses your location to find real restaurants, then proposes them to everyone connected.</p>
-                    <div class="concierge-actions">
-                        <button class="btn" id="ask-table-btn"><i class="fa-solid fa-people-group"></i> Ask the table</button>
-                        <button class="btn" id="find-btn"><i class="fa-solid fa-magnifying-glass-location"></i> Find a place</button>
-                    </div>
-                    <div class="composer">
-                        <textarea id="concierge-input" rows="1" placeholder="Tell your concierge… e.g. somewhere cozy for ramen, not too pricey"></textarea>
-                        <button class="send" id="concierge-send" title="Send (Enter)"><i class="fa-solid fa-paper-plane"></i></button>
-                    </div>
-                    <div class="loc-line" id="loc-line">
-                        <i class="fa-solid fa-location-dot"></i>
-                        <span id="loc-label">Location not set</span>
-                        <a id="loc-set">use my location</a> ·
-                        <a id="loc-manual">enter manually</a>
-                    </div>
-                </div>
-
-                <div class="panel">
-                    <div class="panel-head">
-                        <h2>On the table</h2>
-                        <span class="count" id="cand-count">no options yet</span>
-                    </div>
-                    <div class="cand-list" id="cand-list">
-                        <div class="empty">No options yet. Hit <b>Find a place</b> to search nearby, or tell your concierge what you're craving. Proposals you and your friends make show up here, with everyone's verdict.</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ============ RIGHT: participants + feed ============ -->
-            <div>
-                <div class="panel">
-                    <div class="panel-head">
-                        <h2>The table</h2>
-                        <span class="count" id="peer-count">just you</span>
-                    </div>
-                    <div class="peer-list" id="peer-list"></div>
-                </div>
-
-                <div class="panel">
-                    <div class="panel-head">
-                        <h2 id="feed-title">Activity</h2>
-                        <button class="icon-btn" id="clear-feed" title="Clear" style="margin-left:auto"><i class="fa-solid fa-trash"></i></button>
-                    </div>
-                    <div class="feed" id="feed">
-                        <div class="empty">Your concierge's searches, the agents' negotiation, and table chat all appear here.</div>
-                    </div>
-                    <div class="composer" style="margin-top:12px">
-                        <textarea id="chat-input" rows="1" placeholder="Say something to the table…"></textarea>
-                        <button class="send" id="chat-send" title="Send to everyone"><i class="fa-solid fa-comment"></i></button>
-                    </div>
-                </div>
-            </div>
+    <!-- Match celebration -->
+    <div id="celebrate">
+        <div class="cele-card">
+            <div class="cc-e">🎉</div>
+            <h2>It's a match!</h2>
+            <div class="cc-name" id="cele-name">—</div>
+            <div class="cc-sub" id="cele-sub">Everyone's in. Time to eat!</div>
+            <button class="btn block lg" id="cele-go"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> Open in maps</button>
+            <button class="btn ghost block" id="cele-close" style="margin-top:10px">Keep looking</button>
         </div>
     </div>
 
-    <!-- ============ Profile modal ============ -->
-    <div class="modal-overlay" id="profile-modal">
-        <div class="modal">
-            <div class="modal-head"><h2>Your profile</h2><button class="icon-btn" data-close="profile-modal"><i class="fa-solid fa-xmark"></i></button></div>
-            <div class="modal-body">
-                <div class="field"><label>Display name</label><input type="text" id="pf-name" placeholder="e.g. Mia" /></div>
-                <div class="field"><label>Avatar emoji</label><input type="text" id="pf-emoji" maxlength="4" placeholder="🙂" /></div>
-                <div class="modal-foot">
-                    <button class="btn btn-ghost" data-close="profile-modal">Cancel</button>
-                    <button class="btn" id="pf-save"><i class="fa-solid fa-check"></i> Save</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============ Rule modal ============ -->
-    <div class="modal-overlay" id="rule-modal">
-        <div class="modal">
-            <div class="modal-head"><h2 id="rule-modal-title">Add a rule</h2><button class="icon-btn" data-close="rule-modal"><i class="fa-solid fa-xmark"></i></button></div>
-            <div class="modal-body">
-                <div class="field"><label>What should this rule apply to?</label><input type="text" id="rule-target" placeholder="e.g. Joe's Diner — or a cuisine like sushi" /></div>
-                <div class="field">
-                    <label>This is a…</label>
-                    <div class="seg" id="rule-scope-seg">
-                        <div class="opt active" data-scope="restaurant">Specific place</div>
-                        <div class="opt" data-scope="cuisine">A cuisine</div>
-                    </div>
-                </div>
-                <div class="field">
-                    <label>Rule</label>
-                    <div class="seg" id="rule-mode-seg">
-                        <div class="opt active" data-mode="never">Never suggest</div>
-                        <div class="opt" data-mode="conditional">Only if…</div>
-                    </div>
-                </div>
-                <div class="field" id="rule-cond-field" style="display:none">
-                    <label>…only acceptable when</label>
-                    <input type="text" id="rule-condition" placeholder="e.g. it's a special occasion / it's raining / they have a patio" />
-                </div>
-                <div class="field"><label>Note to your AI (optional)</label><input type="text" id="rule-note" placeholder="e.g. terrible service last time" /></div>
-                <div class="modal-foot">
-                    <button class="btn btn-ghost" data-close="rule-modal">Cancel</button>
-                    <button class="btn" id="rule-save"><i class="fa-solid fa-check"></i> Save rule</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============ Add cuisine modal ============ -->
-    <div class="modal-overlay" id="cuisine-modal">
-        <div class="modal">
-            <div class="modal-head"><h2>Add a cuisine</h2><button class="icon-btn" data-close="cuisine-modal"><i class="fa-solid fa-xmark"></i></button></div>
-            <div class="modal-body">
-                <div class="field"><label>Cuisine or food type</label><input type="text" id="cuisine-new" placeholder="e.g. ethiopian, ramen, tapas" /></div>
-                <div class="modal-foot">
-                    <button class="btn btn-ghost" data-close="cuisine-modal">Cancel</button>
-                    <button class="btn" id="cuisine-add-save"><i class="fa-solid fa-check"></i> Add</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============ Manual location modal ============ -->
-    <div class="modal-overlay" id="loc-modal">
-        <div class="modal">
-            <div class="modal-head"><h2>Set location</h2><button class="icon-btn" data-close="loc-modal"><i class="fa-solid fa-xmark"></i></button></div>
-            <div class="modal-body">
-                <p class="panel-sub">Type a place name to look up, or paste exact coordinates.</p>
-                <div class="field"><label>Place / address</label>
-                    <div class="row2">
-                        <input type="text" id="loc-query" placeholder="e.g. Shibuya, Tokyo" />
-                        <button class="btn btn-sm" id="loc-lookup" style="flex:0 0 auto"><i class="fa-solid fa-magnifying-glass"></i></button>
-                    </div>
-                </div>
-                <div class="row2">
-                    <div class="field"><label>Latitude</label><input type="number" id="loc-lat" step="any" placeholder="35.659" /></div>
-                    <div class="field"><label>Longitude</label><input type="number" id="loc-lon" step="any" placeholder="139.700" /></div>
-                </div>
-                <div class="modal-foot">
-                    <button class="btn btn-ghost" data-close="loc-modal">Cancel</button>
-                    <button class="btn" id="loc-save"><i class="fa-solid fa-check"></i> Use this</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============ Store-opinion modal (after a veto/concern) ============ -->
-    <div class="modal-overlay" id="opinion-modal">
-        <div class="modal">
-            <div class="modal-head"><h2>Remember this for next time?</h2><button class="icon-btn" data-close="opinion-modal"><i class="fa-solid fa-xmark"></i></button></div>
-            <div class="modal-body">
-                <p class="panel-sub" id="opinion-ctx"></p>
-                <div class="field">
-                    <label>How should your AI treat it in future?</label>
-                    <div class="seg" id="opinion-seg" style="flex-wrap:wrap">
-                        <div class="opt active" data-op="never">Never again</div>
-                        <div class="opt" data-op="conditional">Only if…</div>
-                        <div class="opt" data-op="cuisine">Avoid this cuisine</div>
-                    </div>
-                </div>
-                <div class="field" id="opinion-cond-field" style="display:none">
-                    <label>…only acceptable when</label>
-                    <input type="text" id="opinion-condition" placeholder="e.g. nowhere else is open" />
-                </div>
-                <div class="field"><label>Why (optional)</label><input type="text" id="opinion-note" placeholder="e.g. too loud, slow service" /></div>
-                <div class="modal-foot">
-                    <button class="btn btn-ghost" data-close="opinion-modal">Skip</button>
-                    <button class="btn" id="opinion-save"><i class="fa-solid fa-check"></i> Save preference</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ============ Import modal ============ -->
-    <div class="modal-overlay" id="import-modal">
-        <div class="modal">
-            <div class="modal-head"><h2>Import preferences</h2><button class="icon-btn" data-close="import-modal"><i class="fa-solid fa-xmark"></i></button></div>
-            <div class="modal-body">
-                <p class="panel-sub">Pick a previously exported <span class="mono">.matchmeal.json</span> file, or paste its contents below.</p>
-                <div class="field"><button class="btn btn-ghost btn-block" id="import-file-btn"><i class="fa-solid fa-folder-open"></i> Choose file…</button><input type="file" id="import-file" accept=".json,application/json" style="display:none" /></div>
-                <div class="field"><label>…or paste JSON</label><textarea id="import-text" style="min-height:120px" placeholder='{"profile":{...},"rules":[...]}'></textarea></div>
-                <div class="modal-foot">
-                    <button class="btn btn-ghost" data-close="import-modal">Cancel</button>
-                    <button class="btn" id="import-apply"><i class="fa-solid fa-check"></i> Import</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <input type="file" id="hidden-import" accept=".json,application/json" style="display:none" />
-    <div class="toast-wrap" id="toast-wrap"></div>
-    <div class="corner-links">
-        <a id="reset-link" title="Forget everything on this device">↺ Reset</a>
-        <a href="https://github.com/woodyhoko/ai-mesh" target="_blank" rel="noopener">➤ Inspired by ai-mesh</a>
-        <a title="Copyright (c) 2026 woodyhoko. All Rights Reserved." style="cursor:default">© 2026 woodyhoko</a>
-    </div>
-
-    <script type="module">
-        /* The MediaPipe GenAI runtime (~heavy) is only needed for the on-device
-           Gemma fallback, so it's dynamically imported inside loadGemma() — the
-           page itself loads instantly and Chrome built-in AI users never fetch it. */
-
-        /* ======================================================================
-           AI BACKEND — Chrome built-in Prompt API, with on-device Gemma fallback.
-           (Same approach as the ai-mesh project: zero-download Prompt API when the
-           browser has it, otherwise Gemma via LiteRT/WebGPU, weights cached in OPFS.)
-           ====================================================================== */
-        const MODEL_URL = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it-web.task";
-        const MODEL_FILENAME = "gemma-4-E2B-it-web.task";
-
-        const AI = {
-            backend: null, gemmaLlm: null, ready: false,
-            async detect() {
-                if (typeof window.LanguageModel !== 'undefined') {
-                    try {
-                        const avail = await window.LanguageModel.availability();
-                        if (avail && avail !== 'unavailable') { this.backend = 'chrome'; return 'chrome'; }
-                    } catch (_) { }
-                }
-                this.backend = 'gemma'; return 'gemma';
-            },
-            async run(prompt, { schema = null } = {}) {
-                if (this.backend === 'chrome') {
-                    const session = await window.LanguageModel.create();
-                    try {
-                        const opts = schema ? { responseConstraint: schema } : {};
-                        return await session.prompt(prompt, opts);
-                    } finally { session.destroy(); }
-                }
-                const wrapped = `<start_of_turn>user\n${prompt}\n<end_of_turn>\n<start_of_turn>model\n`;
-                const out = await this.gemmaLlm.generateResponse(wrapped);
-                return (out || '').trim();
-            },
-            // Best-effort JSON call with a deterministic fallback so the app never hard-fails.
-            async json(prompt, schema, fallback) {
-                try {
-                    const raw = await this.run(prompt, { schema });
-                    return JSON.parse(extractJson(raw));
-                } catch (e) { console.warn('AI.json failed, using fallback', e); return fallback; }
-            }
-        };
-
-        // Pull the FIRST balanced {...} object out of a model response — robust to
-        // chatty models that wrap JSON in prose or emit more than one object.
-        function extractJson(text) {
-            if (!text) return '{}';
-            const start = text.indexOf('{');
-            if (start === -1) return text;
-            let depth = 0, inStr = false, esc = false;
-            for (let i = start; i < text.length; i++) {
-                const ch = text[i];
-                if (inStr) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') inStr = false; }
-                else if (ch === '"') inStr = true;
-                else if (ch === '{') depth++;
-                else if (ch === '}') { if (--depth === 0) return text.slice(start, i + 1); }
-            }
-            return text.slice(start);
-        }
-
-        function setProgress(pct) { const f = $('progress-fill'); if (f) f.style.width = pct + '%'; }
-
-        async function loadGemma() {
-            const msg = $('loader-message');
-            if (window.location.protocol === 'file:') {
-                alert("Local security restriction:\n\nGemma uses WebGPU/OPFS features browsers block on 'file://'.\nServe over http, e.g.  python -m http.server  then open http://localhost:8000");
-            }
-            const ua = navigator.userAgent;
-            if (!ua.includes('Chrome') && !ua.includes('Edg')) {
-                alert('On-device Gemma needs Chrome or Edge (WebGPU). Other browsers can still connect and use a profile, but the AI features need a supported browser.');
-            }
-            msg.textContent = "Fetching Gemma weights (cached after first download)…";
-            const { stream, size } = await loadModelWithOpfsCache(MODEL_URL, MODEL_FILENAME);
-            const tracked = streamWithProgress(stream, size, (prog, dl, total) => {
-                setProgress(Math.round(prog * 0.9));
-                const mb = b => (b / 1048576).toFixed(0);
-                msg.innerHTML = total
-                    ? `Downloading Gemma… ${prog}% (${mb(dl)} / ${mb(total)} MB)<br><span style="font-size:.8em;opacity:.6">Cached for next time</span>`
-                    : `Downloading Gemma… ${mb(dl)} MB`;
-            });
-            msg.textContent = "Warming up WebGPU & compiling the model…";
-            setProgress(95);
-            const { FilesetResolver, LlmInference } = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai/+esm');
-            const fileset = await FilesetResolver.forGenAiTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-genai/wasm');
-            AI.gemmaLlm = await LlmInference.createFromOptions(fileset, {
-                baseOptions: { modelAssetBuffer: tracked.getReader() }, maxTokens: 1024, topK: 16, temperature: 0.7
-            });
-            setProgress(100);
-        }
-        function streamWithProgress(inputStream, contentLength, onProgress) {
-            let downloaded = 0;
-            return inputStream.pipeThrough(new TransformStream({
-                transform: (chunk, controller) => {
-                    downloaded += chunk.byteLength;
-                    const prog = contentLength > 0 ? Math.min(100, Math.round(downloaded / contentLength * 100)) : 0;
-                    try { onProgress && onProgress(prog, downloaded, contentLength); } catch (_) { }
-                    controller.enqueue(chunk);
-                }
-            }));
-        }
-        async function loadModelWithOpfsCache(modelUrl, fileName) {
-            try {
-                const opfsRoot = await navigator.storage.getDirectory();
-                try {
-                    const fh = await opfsRoot.getFileHandle(fileName);
-                    const file = await fh.getFile();
-                    const sh = await opfsRoot.getFileHandle(fileName + "_size");
-                    const expected = parseInt(await (await sh.getFile()).text(), 10);
-                    if (Number.isFinite(expected) && file.size === expected) return { stream: file.stream(), size: file.size };
-                    await opfsRoot.removeEntry(fileName).catch(() => { });
-                    await opfsRoot.removeEntry(fileName + "_size").catch(() => { });
-                } catch (e) { if (e && e.name !== "NotFoundError") console.warn("OPFS read error:", e); }
-                let expectedSize = 0;
-                try { const head = await fetch(modelUrl, { method: "HEAD" }); if (head.ok) expectedSize = Number(head.headers.get("Content-Length") || 0); } catch (_) { }
-                const response = await fetch(modelUrl);
-                if (!response.ok || !response.body) throw new Error(`Failed to fetch Gemma weights: ${response.status}`);
-                const [consumer, cache] = response.body.tee();
-                (async () => {
-                    try {
-                        const fh = await opfsRoot.getFileHandle(fileName, { create: true });
-                        const w = await fh.createWritable();
-                        const sh = await opfsRoot.getFileHandle(fileName + "_size", { create: true });
-                        const sw = await sh.createWritable();
-                        await sw.write(new TextEncoder().encode(String(expectedSize))); await sw.close();
-                        await cache.pipeTo(w);
-                    } catch (err) {
-                        await opfsRoot.removeEntry(fileName).catch(() => { });
-                        await opfsRoot.removeEntry(fileName + "_size").catch(() => { });
-                    }
-                })();
-                return { stream: consumer, size: expectedSize };
-            } catch (err) {
-                console.warn("OPFS unavailable, direct fetch:", err);
-                const response = await fetch(modelUrl);
-                if (!response.ok || !response.body) throw new Error(`Failed to fetch Gemma weights: ${response.status}`);
-                return { stream: response.body, size: Number(response.headers.get("Content-Length") || 0) };
-            }
-        }
-
-        /* ======================================================================
-           STATE — profile, rules, location all persist in localStorage so nobody
-           ever has to re-enter anything.
-           ====================================================================== */
-        const uid = () => Math.random().toString(36).slice(2, 10);
-        const now = () => Date.now();
+    <script>
+        'use strict';
+        /* ============================ helpers ============================ */
         const $ = id => document.getElementById(id);
+        const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+        const uid = (n = 6) => Array.from({ length: n }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+        const rid = () => Math.random().toString(36).slice(2, 10);
+        const now = () => Date.now();
         const esc = s => (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-        const ago = ts => { const s = Math.floor((now() - ts) / 1000); return s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m` : `${Math.floor(s / 3600)}h`; };
+        const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+        function haptic(ms = 12) { try { navigator.vibrate && navigator.vibrate(ms); } catch (_) {} }
+        function toast(msg, kind = '') {
+            const t = el('div', 'toast ' + kind, esc(msg));
+            $('toasts').appendChild(t);
+            setTimeout(() => { t.style.transition = 'opacity .3s, transform .3s'; t.style.opacity = '0'; t.style.transform = 'translateY(8px)'; setTimeout(() => t.remove(), 320); }, 2600);
+        }
 
-        const DEFAULT_CUISINES = ['italian', 'japanese', 'chinese', 'thai', 'indian', 'mexican', 'korean', 'vietnamese', 'american', 'mediterranean', 'french', 'pizza', 'burgers', 'sushi', 'bbq', 'seafood', 'ramen', 'tapas', 'vegan', 'dessert'];
-        const DIET_TAGS = ['vegetarian', 'vegan', 'halal', 'kosher', 'gluten-free', 'nut-free', 'dairy-free', 'pescatarian', 'no pork', 'no beef'];
-        const BUDGET_ORDER = ['$', '$$', '$$$', '$$$$'];
+        const CUISINES = ['🍜 ramen', '🍕 pizza', '🍣 sushi', '🍔 burgers', '🌮 mexican', '🍝 italian', '🥘 thai', '🍛 indian', '🥟 chinese', '🍲 korean', '🥗 salads', '🍢 izakaya', '🍤 seafood', '🥩 bbq', '🧆 mediterranean', '🍩 cafe', '🌱 vegan', '🥐 french'];
+        const DIET = ['🥕 vegetarian', '🌱 vegan', '☪️ halal', '✡️ kosher', '🌾 gluten-free', '🥜 nut-free', '🐟 pescatarian', '🚫🥩 no beef', '🚫🐖 no pork'];
+        const BUDGETS = [['$', 'cheap'], ['$$', 'mid'], ['$$$', 'pricey'], ['$$$$', 'fancy']];
+        const RADII = [['👟', '1 km', 1000], ['🚲', '2.5 km', 2500], ['🚗', '6 km', 6000], ['🌍', '15 km', 15000]];
+        const AVATARS = ['😀', '😎', '🦊', '🐼', '🐨', '🐯', '🦁', '🐸', '🐵', '🦄', '🐙', '🦖', '🍔', '🍙', '🌮', '🥑', '🍓', '🌶️', '🧋', '🍑'];
 
-        const State = {
-            profile: {
-                name: '', emoji: '🙂',
-                cuisines: {},      // { italian: 'love' | 'avoid' }
-                extraCuisines: [], // user-added cuisine names
-                diet: [],          // selected diet tags
-                budget: '$$',
-                notes: ''
-            },
-            radius: 1500,
-            rules: [],             // { id, scope:'restaurant'|'cuisine', target, mode:'never'|'conditional', condition, note }
-            location: null,        // { lat, lon, label, ts }
-            isHost: true,
-            // ---- runtime session (not persisted) ----
-            proposals: [],         // shared negotiation board
-            peerMoods: {},         // peerId -> mood text
-            vetoedNames: new Set(),
-
+        /* ============================ state ============================ */
+        const S = {
+            me: { id: null, name: '', emoji: '😀', loves: [], avoids: [], diet: [], budget: '$$', radius: 2500 },
+            settings: { ai: false, autoRespond: true },
+            loc: null,                 // {lat, lon, label}
+            onboarded: false,
+            tableHost: null,           // host id we joined (null if I'm host)
+            // runtime
+            members: new Map(),        // id -> {id,name,emoji,prefs,online}
+            options: [],               // {id,name,cuisine,lat,lon,dist,address,by,byName,reactions:{id:'in'|'ok'|'no'},won}
+            seen: new Set(), seenOrder: [],
             load() {
                 try {
-                    const p = JSON.parse(localStorage.getItem('mm_profile') || 'null'); if (p) this.profile = { ...this.profile, ...p };
-                    const r = JSON.parse(localStorage.getItem('mm_rules') || 'null'); if (Array.isArray(r)) this.rules = r;
-                    const l = JSON.parse(localStorage.getItem('mm_location') || 'null'); if (l) this.location = l;
-                    const rad = parseInt(localStorage.getItem('mm_radius') || '0', 10); if (rad) this.radius = rad;
-                    const h = localStorage.getItem('mm_host'); if (h !== null) this.isHost = h === '1';
-                } catch (_) { }
-                if (!this.profile.name) this.profile.name = randomName();
+                    const p = JSON.parse(localStorage.getItem('mm2_me') || 'null'); if (p) this.me = { ...this.me, ...p };
+                    const s = JSON.parse(localStorage.getItem('mm2_set') || 'null'); if (s) this.settings = { ...this.settings, ...s };
+                    const l = JSON.parse(localStorage.getItem('mm2_loc') || 'null'); if (l) this.loc = l;
+                    this.onboarded = localStorage.getItem('mm2_onb') === '1';
+                } catch (_) {}
+                if (!this.me.name) this.me.name = '';
             },
             save() {
-                localStorage.setItem('mm_profile', JSON.stringify(this.profile));
-                localStorage.setItem('mm_rules', JSON.stringify(this.rules));
-                if (this.location) localStorage.setItem('mm_location', JSON.stringify(this.location));
-                localStorage.setItem('mm_radius', String(this.radius));
-                localStorage.setItem('mm_host', this.isHost ? '1' : '0');
+                localStorage.setItem('mm2_me', JSON.stringify(this.me));
+                localStorage.setItem('mm2_set', JSON.stringify(this.settings));
+                if (this.loc) localStorage.setItem('mm2_loc', JSON.stringify(this.loc));
+                localStorage.setItem('mm2_onb', this.onboarded ? '1' : '0');
             },
-            // The portable preference bundle for import/export.
-            exportBundle() {
-                return { app: 'matchmeal', version: 1, exportedAt: new Date().toISOString(), profile: this.profile, rules: this.rules, radius: this.radius, location: this.location };
-            },
-            importBundle(b) {
-                if (!b || typeof b !== 'object') throw new Error('not a MatchMeal file');
-                if (b.profile) this.profile = { ...this.profile, ...b.profile };
-                if (Array.isArray(b.rules)) this.rules = b.rules;
-                if (b.radius) this.radius = b.radius;
-                if (b.location) this.location = b.location;
-                this.save();
-            }
+            myPrefs() { const m = this.me; return { name: m.name, emoji: m.emoji, loves: m.loves, avoids: m.avoids, diet: m.diet, budget: m.budget, radius: m.radius }; }
         };
 
-        function randomName() {
-            const a = ['Hungry', 'Peckish', 'Famished', 'Snackish', 'Ravenous', 'Curious', 'Choosy', 'Easygoing'];
-            const b = ['Otter', 'Panda', 'Fox', 'Heron', 'Tapir', 'Cardamom', 'Basil', 'Miso'];
-            return `${a[Math.floor(Math.random() * a.length)]} ${b[Math.floor(Math.random() * b.length)]}`;
+        // member list (self + online peers) used for ranking & consensus
+        function liveMembers() {
+            const arr = [{ id: S.me.id, name: S.me.name, emoji: S.me.emoji, prefs: S.myPrefs(), online: true, me: true }];
+            for (const m of S.members.values()) if (m.online) arr.push(m);
+            return arr;
+        }
+        function memberInfo(id) {
+            if (id === S.me.id) return { name: S.me.name, emoji: S.me.emoji };
+            const m = S.members.get(id); return m ? { name: m.name, emoji: m.emoji } : { name: '?', emoji: '🙂' };
         }
 
-        // Build a compact, human-readable description of my tastes for the LLM.
-        function myTasteSummary(extra = '') {
-            const p = State.profile;
-            const loves = Object.keys(p.cuisines).filter(c => p.cuisines[c] === 'love');
-            const avoids = Object.keys(p.cuisines).filter(c => p.cuisines[c] === 'avoid');
-            const lines = [];
-            if (loves.length) lines.push(`Loves: ${loves.join(', ')}.`);
-            if (avoids.length) lines.push(`Dislikes: ${avoids.join(', ')}.`);
-            if (p.diet.length) lines.push(`Dietary needs: ${p.diet.join(', ')}.`);
-            lines.push(`Budget up to ${p.budget}.`);
-            if (p.notes) lines.push(`Notes: ${p.notes}`);
-            const neverRules = State.rules.filter(r => r.mode === 'never').map(r => `${r.target}${r.note ? ' (' + r.note + ')' : ''}`);
-            const condRules = State.rules.filter(r => r.mode === 'conditional').map(r => `${r.target} only if ${r.condition}`);
-            if (neverRules.length) lines.push(`Never suggest: ${neverRules.join('; ')}.`);
-            if (condRules.length) lines.push(`Conditional: ${condRules.join('; ')}.`);
-            if (extra) lines.push(`Right now: ${extra}`);
-            return lines.join(' ');
+        /* ============================ AI (Chrome built-in, optional) ============================ */
+        const AI = {
+            available: false, session: null,
+            async detect() {
+                try {
+                    if (typeof window.LanguageModel !== 'undefined') {
+                        // Never let a slow/hung availability() block the app — race a timeout.
+                        const a = await Promise.race([
+                            window.LanguageModel.availability(),
+                            new Promise(r => setTimeout(() => r('unavailable'), 1500))
+                        ]);
+                        this.available = !!a && a !== 'unavailable';
+                    }
+                } catch (_) { this.available = false; }
+                return this.available;
+            },
+            async react(option) {
+                // returns {r, reason}
+                const schema = { type: 'object', properties: { r: { type: 'string', enum: ['in', 'ok', 'no'] }, reason: { type: 'string' } }, required: ['r'] };
+                const p = S.me;
+                const prompt = `You react on behalf of a diner to a restaurant suggestion. Reply ONLY as JSON.
+Diner loves: ${p.loves.join(', ') || 'anything'}. Avoids: ${p.avoids.join(', ') || 'nothing'}. Diet: ${p.diet.join(', ') || 'none'}. Budget up to ${p.budget}.
+Suggestion: "${option.name}" (${option.cuisine || 'unknown'}), ${option.dist}m away.
+Pick "in" (happy to go), "ok" (fine, minor worry), or "no" (won't go). One short reason.
+JSON: {"r":"in|ok|no","reason":"..."}`;
+                try {
+                    const s = await window.LanguageModel.create();
+                    let raw;
+                    try { raw = await s.prompt(prompt, { responseConstraint: schema }); } finally { s.destroy(); }
+                    const o = JSON.parse(extractJson(raw));
+                    if (['in', 'ok', 'no'].includes(o.r)) return { r: o.r, reason: (o.reason || '').trim() };
+                } catch (e) { console.warn('AI react failed', e); }
+                return null;
+            }
+        };
+        function extractJson(t) {
+            if (!t) return '{}';
+            const s = t.indexOf('{'); if (s < 0) return t;
+            let d = 0, q = false, e = false;
+            for (let i = s; i < t.length; i++) { const c = t[i]; if (q) { if (e) e = false; else if (c === '\\') e = true; else if (c === '"') q = false; } else if (c === '"') q = true; else if (c === '{') d++; else if (c === '}') { if (--d === 0) return t.slice(s, i + 1); } }
+            return t.slice(s);
         }
 
-        /* ======================================================================
-           WEB SEARCH — real nearby restaurants from OpenStreetMap (Overpass API).
-           Keyless, CORS-enabled. This is the "tool" the concierge calls.
-           ====================================================================== */
-        function haversine(lat1, lon1, lat2, lon2) {
-            const R = 6371000, toRad = d => d * Math.PI / 180;
-            const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
-            const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-            return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+        // Deterministic reaction from preferences (no AI needed) — this is how
+        // a no-AI / low-end user still contributes a verdict from their taste.
+        function smartReact(option) {
+            const cu = (option.cuisine || '').toLowerCase(), nm = (option.name || '').toLowerCase();
+            const loves = S.me.loves.map(bareWord), avoids = S.me.avoids.map(bareWord);
+            if (avoids.some(a => a && (cu.includes(a) || nm.includes(a)))) return { r: 'no', reason: `not keen on ${avoids.find(a => cu.includes(a) || nm.includes(a))}` };
+            if (option.dist > S.me.radius * 1.35) return { r: 'ok', reason: `a bit far (${option.dist}m)` };
+            if (loves.some(l => l && (cu.includes(l) || nm.includes(l)))) return { r: 'in', reason: `love ${loves.find(l => cu.includes(l) || nm.includes(l))}` };
+            return { r: 'in', reason: 'works for me' };
         }
-        const OVERPASS = [
-            'https://overpass-api.de/api/interpreter',
-            'https://overpass.kumi.systems/api/interpreter',
-            'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
-        ];
-        async function searchRestaurants(lat, lon, radius = 1500, max = 60) {
-            const q = `[out:json][timeout:25];(node["amenity"~"^(restaurant|cafe|fast_food)$"](around:${radius},${lat},${lon}););out body ${max};`;
+        const bareWord = s => (s || '').replace(/^[^\p{L}]+/u, '').toLowerCase().trim(); // strip leading emoji
+
+        /* ============================ search (OpenStreetMap) ============================ */
+        function haversine(a, b, c, d) { const R = 6371000, r = x => x * Math.PI / 180; const dla = r(c - a), dlo = r(d - b); const h = Math.sin(dla / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(dlo / 2) ** 2; return Math.round(R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))); }
+        const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+        async function fetchNearby(lat, lon, radius) {
+            const q = `[out:json][timeout:25];(node["amenity"~"^(restaurant|cafe|fast_food)$"](around:${radius},${lat},${lon}););out body 80;`;
             for (const ep of OVERPASS) {
                 try {
-                    const res = await fetch(ep, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
-                    if (!res.ok) continue;
-                    const json = await res.json();
-                    const out = (json.elements || []).filter(e => e.tags && e.tags.name).map(e => {
-                        const t = e.tags;
-                        return {
-                            name: t.name,
-                            cuisine: (t.cuisine || '').replace(/[_;]/g, ' ').replace(/\s+/g, ' ').trim(),
-                            kind: t.amenity,
-                            lat: e.lat, lon: e.lon,
-                            dist: haversine(lat, lon, e.lat, e.lon),
-                            address: [t['addr:housenumber'], t['addr:street']].filter(Boolean).join(' '),
-                            veg: t['diet:vegetarian'] === 'yes' || t['diet:vegetarian'] === 'only',
-                            vegan: t['diet:vegan'] === 'yes' || t['diet:vegan'] === 'only',
-                            halal: t['diet:halal'] === 'yes' || t['diet:halal'] === 'only'
-                        };
-                    });
-                    out.sort((a, b) => a.dist - b.dist);
-                    return out;
-                } catch (e) { console.warn('overpass endpoint failed', ep, e); }
+                    const r = await fetch(ep, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+                    if (!r.ok) continue;
+                    const j = await r.json();
+                    return (j.elements || []).filter(e => e.tags && e.tags.name).map(e => ({
+                        name: e.tags.name, cuisine: (e.tags.cuisine || '').replace(/[_;]/g, ' ').replace(/\s+/g, ' ').trim(),
+                        kind: e.tags.amenity, lat: e.lat, lon: e.lon, dist: haversine(lat, lon, e.lat, e.lon),
+                        address: [e.tags['addr:housenumber'], e.tags['addr:street']].filter(Boolean).join(' '),
+                        veg: e.tags['diet:vegetarian'] === 'yes', vegan: e.tags['diet:vegan'] === 'yes'
+                    })).sort((a, b) => a.dist - b.dist);
+                } catch (_) {}
             }
-            throw new Error('All restaurant search endpoints failed.');
+            throw new Error('Could not reach the restaurant search.');
         }
-        // Forward geocode a place name (manual location lookup).
-        async function geocode(query) {
-            const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
-            const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
-            const j = await res.json();
-            if (!j.length) throw new Error('Place not found');
-            return { lat: parseFloat(j[0].lat), lon: parseFloat(j[0].lon), label: j[0].display_name.split(',').slice(0, 2).join(', ') };
-        }
-        async function reverseGeocode(lat, lon) {
-            try {
-                const url = `https://nominatim.openstreetmap.org/reverse?format=json&zoom=14&lat=${lat}&lon=${lon}`;
-                const r = await fetch(url, { headers: { 'Accept': 'application/json' } });
-                const j = await r.json();
-                const a = j.address || {};
-                return a.suburb || a.neighbourhood || a.city || a.town || a.village || a.county || `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
-            } catch (_) { return `${lat.toFixed(3)}, ${lon.toFixed(3)}`; }
-        }
+        async function geocode(qy) { const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(qy)}`, { headers: { Accept: 'application/json' } }); const j = await r.json(); if (!j.length) throw new Error('Not found'); return { lat: +j[0].lat, lon: +j[0].lon, label: j[0].display_name.split(',').slice(0, 2).join(', ') }; }
+        async function reverse(lat, lon) { try { const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=14&lat=${lat}&lon=${lon}`, { headers: { Accept: 'application/json' } }); const a = (await r.json()).address || {}; return a.suburb || a.neighbourhood || a.city || a.town || a.village || `${lat.toFixed(2)}, ${lon.toFixed(2)}`; } catch (_) { return `${lat.toFixed(2)}, ${lon.toFixed(2)}`; } }
+        function gps() { return new Promise((res, rej) => { if (!navigator.geolocation) return rej(new Error('no geolocation')); navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lon: p.coords.longitude }), rej, { timeout: 10000, maximumAge: 600000 }); }); }
 
-        function ensureLocation() {
-            return new Promise((resolve) => {
-                if (State.location) return resolve(State.location);
-                if (!navigator.geolocation) { toast('Geolocation unavailable — set a location manually.', 'bad'); openModal('loc-modal'); return resolve(null); }
-                toast('Asking your browser for your location…');
-                navigator.geolocation.getCurrentPosition(async pos => {
-                    const lat = pos.coords.latitude, lon = pos.coords.longitude;
-                    const label = await reverseGeocode(lat, lon);
-                    State.location = { lat, lon, label, ts: now() }; State.save(); renderLocation();
-                    resolve(State.location);
-                }, err => {
-                    console.warn(err); toast('Could not get location — enter it manually.', 'bad'); openModal('loc-modal'); resolve(null);
-                }, { timeout: 10000, maximumAge: 600000 });
-            });
-        }
-
-        /* ======================================================================
-           THE MESH — real WebRTC data channels via PeerJS (same plumbing as
-           ai-mesh). Hosts stay on the broker so friends can dial in; everyone
-           gossips their peer list so 3+ people form a full mesh.
-           ====================================================================== */
+        /* ============================ mesh (PeerJS) ============================ */
         const Mesh = {
-            peer: null, myId: null, online: false,
-            conns: new Map(),   // peerId -> { conn, name, emoji, relayed }
-            seen: new Set(), seenOrder: [],
-
-            async start() {
-                const shortId = 'meal-' + Array.from({ length: 6 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
-                return new Promise((resolve) => {
-                    this.peer = new Peer(shortId, { debug: 1 });
-                    this.peer.on('open', id => { this.myId = id; this.online = true; resolve(id); });
-                    this.peer.on('connection', conn => this._wire(conn, false));
-                    this.peer.on('error', err => {
-                        console.warn('Peer error:', err.type, err);
-                        if (err.type === 'unavailable-id') { this.peer.destroy(); this.start().then(resolve); }
-                        else if (err.type === 'peer-unavailable') toast('That friend is offline or the id is wrong.', 'bad');
-                        else if (!this.myId) { this.myId = shortId; resolve(shortId); toast('Signalling broker unreachable — running solo.', 'bad'); }
+            peer: null, conns: new Map(), online: false,
+            seenAdd(id) { S.seen.add(id); S.seenOrder.push(id); if (S.seenOrder.length > 800) S.seen.delete(S.seenOrder.shift()); },
+            start() {
+                const myId = 'tbl-' + uid(6);
+                return new Promise(res => {
+                    this.peer = new Peer(myId, { debug: 1 });
+                    this.peer.on('open', id => { S.me.id = id; this.online = true; res(id); });
+                    this.peer.on('connection', c => this.wire(c, true));
+                    this.peer.on('error', e => {
+                        console.warn('peer err', e.type);
+                        if (e.type === 'unavailable-id') { this.peer.destroy(); this.start().then(res); }
+                        else if (e.type === 'peer-unavailable') toast('That table is offline or the link is old.', 'bad');
+                        else if (!S.me.id) { S.me.id = myId; res(myId); toast('Signalling unreachable — running solo.', 'bad'); }
                     });
-                    this.peer.on('disconnected', () => { if (State.isHost) { try { this.peer.reconnect(); } catch (_) { } } });
+                    this.peer.on('disconnected', () => { if (!S.tableHost) { try { this.peer.reconnect(); } catch (_) {} } });
                 });
             },
-            seenAdd(id) { this.seen.add(id); this.seenOrder.push(id); if (this.seenOrder.length > 600) this.seen.delete(this.seenOrder.shift()); },
-
-            connectTo(peerId, relayed = false) {
-                peerId = (peerId || '').trim();
-                if (!peerId || peerId === this.myId || this.conns.has(peerId)) return;
-                const conn = this.peer.connect(peerId, { reliable: true });
-                this._wire(conn, relayed);
-            },
-            _wire(conn, relayed) {
+            connect(id) { id = (id || '').trim(); if (!id || id === S.me.id || this.conns.has(id)) return; this.wire(this.peer.connect(id, { reliable: true }), false); },
+            wire(conn, incoming) {
                 conn.on('open', () => {
-                    this.conns.set(conn.peer, { conn, name: conn.peer, emoji: '🙂', relayed });
-                    this._send(conn, this._envelope('HELLO', { name: State.profile.name, emoji: State.profile.emoji, peers: [...this.conns.keys()].filter(p => p !== conn.peer) }));
-                    // Re-share any proposals already on my board so late joiners see the full table.
-                    State.proposals.forEach(p => this._send(conn, this._envelope('PROPOSE', { proposal: serializeProposal(p) })));
-                    renderPeers(); updateMeshStat();
-                    feedSys(`<b>${esc(this.conns.get(conn.peer).name)}</b> joined the table.`);
+                    this.conns.set(conn.peer, conn);
+                    if (!S.members.has(conn.peer)) S.members.set(conn.peer, { id: conn.peer, name: conn.peer, emoji: '🙂', prefs: null, online: true });
+                    else S.members.get(conn.peer).online = true;
+                    // introduce + share my prefs + gossip peers
+                    this.send(conn, env('HELLO', { name: S.me.name, emoji: S.me.emoji, prefs: S.myPrefs(), peers: [...this.conns.keys()].filter(p => p !== conn.peer) }));
+                    // The side that was DIALED hands the newcomer the full table state.
+                    if (incoming) this.send(conn, env('SYNC', { options: S.options.map(serOpt), members: liveMembers().filter(m => !m.me).map(m => ({ id: m.id, name: m.name, emoji: m.emoji, prefs: m.prefs })) }));
+                    renderApp();
                 });
-                conn.on('data', raw => this._onMessage(conn, raw));
-                conn.on('close', () => { this.conns.delete(conn.peer); renderPeers(); updateMeshStat(); renderProposals(); });
-                conn.on('error', e => console.warn('conn error', conn.peer, e));
+                conn.on('data', d => this.onMsg(conn, d));
+                conn.on('close', () => { this.conns.delete(conn.peer); const m = S.members.get(conn.peer); if (m) m.online = false; renderApp(); });
+                conn.on('error', e => console.warn('conn err', e));
             },
-            _envelope(type, payload, ttl = 4) { return { v: 1, id: uid(), type, from: this.myId, fromName: State.profile.name, fromEmoji: State.profile.emoji, ttl, ts: now(), payload }; },
-            _send(conn, env) { try { conn.send(env); } catch (e) { console.warn('send fail', e); } },
-            broadcast(env, exceptPeer = null) { for (const [pid, info] of this.conns) { if (pid !== exceptPeer) this._send(info.conn, env); } },
-            emit(type, payload) { const env = this._envelope(type, payload); this.seenAdd(env.id); this.broadcast(env); return env; },
-
-            _onMessage(conn, env) {
-                if (!env || typeof env !== 'object' || !env.id) return;
-                if (this.seen.has(env.id)) return;
-                this.seenAdd(env.id);
-
-                if (env.type === 'HELLO') {
-                    const info = this.conns.get(conn.peer);
-                    if (info) { info.name = env.payload.name || conn.peer; info.emoji = env.payload.emoji || '🙂'; }
-                    (env.payload.peers || []).forEach(pid => { if (pid !== this.myId && !this.conns.has(pid)) this.connectTo(pid, true); });
-                    renderPeers(); renderProposals();
-                    return;
+            send(conn, e) { try { conn.send(e); } catch (_) {} },
+            bcast(e, except) { for (const [pid, c] of this.conns) if (pid !== except) this.send(c, e); },
+            emit(type, payload) { const e = env(type, payload); this.seenAdd(e.id); this.bcast(e); return e; },
+            onMsg(conn, e) {
+                if (!e || !e.id) return;
+                if (e.type === 'HELLO') {
+                    const m = S.members.get(conn.peer) || { id: conn.peer };
+                    m.name = e.payload.name || conn.peer; m.emoji = e.payload.emoji || '🙂'; m.prefs = e.payload.prefs || m.prefs; m.online = true;
+                    S.members.set(conn.peer, m);
+                    (e.payload.peers || []).forEach(p => { if (p !== S.me.id && !this.conns.has(p)) this.connect(p); });
+                    renderApp(); return;
                 }
-                // Everything below is gossip — handle locally, then keep flooding the mesh.
-                handleMeshEvent(env);
-                if (env.ttl > 1 && env.type !== 'HELLO') this.broadcast({ ...env, ttl: env.ttl - 1 }, conn.peer);
+                if (S.seen.has(e.id)) return; this.seenAdd(e.id);
+                handle(e);
+                if (e.type !== 'SYNC' && e.ttl > 1) this.bcast({ ...e, ttl: e.ttl - 1 }, conn.peer);
             }
         };
+        function env(type, payload, ttl = 5) { return { id: rid(), type, from: S.me.id, fromName: S.me.name, fromEmoji: S.me.emoji, ttl, ts: now(), payload }; }
+        function serOpt(o) { return { id: o.id, name: o.name, cuisine: o.cuisine, lat: o.lat, lon: o.lon, dist: o.dist, address: o.address, by: o.by, byName: o.byName, pitch: o.pitch, reactions: o.reactions, won: o.won }; }
+        function findOpt(id) { return S.options.find(o => o.id === id); }
 
-        function updateMeshStat() {
-            const stat = $('mesh-stat'), lbl = $('mesh-stat-label');
-            const n = Mesh.conns.size;
-            if (Mesh.online && n > 0) { stat.className = 'mesh-stat online'; lbl.textContent = `${n} connected${State.isHost ? ' · host' : ''}`; }
-            else if (Mesh.online) { stat.className = 'mesh-stat online'; lbl.textContent = State.isHost ? 'Hosting — share your link' : 'Online — solo'; }
-            else { stat.className = 'mesh-stat'; lbl.textContent = 'Offline'; }
-        }
-
-        /* ======================================================================
-           NEGOTIATION PROTOCOL
-           PROPOSE  — someone's concierge puts a restaurant on the table
-           VERDICT  — an agent's stance on a proposal (on its owner's behalf)
-           ASK      — an agent asks the table a question (mood / concerns)
-           ANSWER   — an agent answers on its owner's behalf
-           FINALIZE — the proposer locks in a place everyone's happy with
-           CHAT     — a plain human message to the whole table
-           ====================================================================== */
-        function serializeProposal(p) { return { id: p.id, name: p.name, cuisine: p.cuisine, dist: p.dist, address: p.address, lat: p.lat, lon: p.lon, pitch: p.pitch, by: p.by, byName: p.byName }; }
-        function findProposal(id) { return State.proposals.find(p => p.id === id); }
-
-        function handleMeshEvent(env) {
-            const p = env.payload || {};
-            if (env.type === 'PROPOSE') return onProposal(p.proposal, env);
-            if (env.type === 'VERDICT') return onVerdict(p, env);
-            if (env.type === 'FINALIZE') return onFinalize(p, env);
-            if (env.type === 'ASK') return onAsk(p, env);
-            if (env.type === 'ANSWER') return onAnswer(p, env);
-            if (env.type === 'CHAT') return feedChat(env.fromName, env.fromEmoji, p.text);
-        }
-
-        // A proposal arrived from a peer — add it, then let MY agent judge it on my behalf.
-        async function onProposal(prop, env) {
-            if (!prop || findProposal(prop.id)) return;
-            const proposal = { ...prop, verdicts: {}, finalized: false };
-            State.proposals.unshift(proposal);
-            renderProposals();
-            feedAsk(env.fromName, env.fromEmoji, `proposes <b>${esc(prop.name)}</b> — my agent is checking it against your tastes…`);
-            const v = await evaluateProposal(proposal);
-            setMyVerdict(proposal, v, /*broadcast*/true);
-        }
-
-        function onVerdict(p, env) {
-            const proposal = findProposal(p.proposalId); if (!proposal) return;
-            proposal.verdicts[env.from] = { stance: p.stance, reason: p.reason, name: env.fromName, emoji: env.fromEmoji };
-            renderProposals();
-        }
-        function onFinalize(p, env) {
-            const proposal = findProposal(p.proposalId); if (!proposal) return;
-            proposal.finalized = true; State.proposals.forEach(x => { if (x.id !== proposal.id) x.finalized = false; });
-            renderProposals();
-            feedSys(`🎉 <b>${esc(env.fromName)}</b> locked in <b>${esc(proposal.name)}</b>. Bon appétit!`);
-            toast(`It's settled: ${proposal.name} 🎉`, 'ok');
-        }
-        async function onAsk(p, env) {
-            feedAsk(env.fromName, env.fromEmoji, esc(p.question));
-            // My agent answers on my behalf, drawing only on my on-device profile.
-            const answer = await answerQuestion(p.topic, p.question, p.context);
-            Mesh.emit('ANSWER', { topic: p.topic, askId: p.askId, text: answer });
-            feedAnswer(State.profile.name, State.profile.emoji, answer, true);
-        }
-        function onAnswer(p, env) {
-            if (p.topic === 'mood') State.peerMoods[env.from] = `${env.fromName}: ${p.text}`;
-            feedAnswer(env.fromName, env.fromEmoji, p.text, false);
-        }
-
-        /* ======================================================================
-           THE CONCIERGE AGENT — searches, proposes, evaluates, and speaks for you.
-           ====================================================================== */
-
-        // Decide search parameters from the combined table preferences. (function-call #1)
-        async function planSearch(extraIntent) {
-            const moods = Object.values(State.peerMoods).join(' | ');
-            const schema = { type: 'object', properties: { cuisines: { type: 'array', items: { type: 'string' } }, vibe: { type: 'string' } }, required: ['cuisines'] };
-            const loves = Object.keys(State.profile.cuisines).filter(c => State.profile.cuisines[c] === 'love');
-            const prompt = `You are a dining concierge planning a restaurant search for a group.
-MY OWNER: ${myTasteSummary(extraIntent)}
-OTHERS AT THE TABLE: ${moods || '(no input yet)'}
-
-Pick 1-4 cuisine/food keywords (lowercase, single words like "ramen", "italian", "vegan") that best satisfy the WHOLE group, balancing everyone. Avoid anyone's disliked cuisines.
-Respond ONLY as JSON: {"cuisines":["..."],"vibe":"a few words on the mood"}`;
-            const fb = { cuisines: loves.slice(0, 3), vibe: '' };
-            const out = await AI.json(prompt, schema, fb);
-            // Keep only real words (guards against models that echo "..." placeholders).
-            out.cuisines = (Array.isArray(out.cuisines) ? out.cuisines : []).filter(c => typeof c === 'string' && /[a-z]{2,}/i.test(c)).map(c => c.toLowerCase().trim());
-            if (!out.cuisines.length) out.cuisines = fb.cuisines;
-            return out;
-        }
-
-        // Score + pick the best candidate and write a short pitch. (function-call #2)
-        async function pickBest(candidates, extraIntent) {
-            const list = candidates.map((c, i) => `${i}. ${c.name.slice(0, 34)} (${(c.cuisine || c.kind).slice(0, 18)}, ${c.dist}m)`).join('\n');
-            const schema = { type: 'object', properties: { choice: { type: 'number' }, pitch: { type: 'string' } }, required: ['choice', 'pitch'] };
-            const want = [...Object.keys(State.profile.cuisines).filter(c => State.profile.cuisines[c] === 'love'), extraIntent].filter(Boolean).join(', ') || 'anything good';
-            const prompt = `Pick ONE restaurant for a group. They want: ${want.slice(0, 160)}. Closer is better.
-${list}
-Reply as JSON only: {"choice":<number>,"pitch":"warm 1-sentence pitch to the table"}`;
-            const fb = { choice: 0, pitch: `${candidates[0].name} is just ${candidates[0].dist} m away${candidates[0].cuisine ? ' and does great ' + candidates[0].cuisine : ''}.` };
-            const out = await AI.json(prompt, schema, fb);
-            let i = Math.round(out.choice); if (!(i >= 0 && i < candidates.length)) i = 0;
-            return { choice: i, pitch: (out.pitch || fb.pitch).trim() };
-        }
-
-        // My agent's stance on a proposal — speaks for ME using only my on-device profile.
-        async function evaluateProposal(proposal) {
-            // Hard rules first (deterministic) so private vetoes never depend on the model.
-            const nameLc = (proposal.name || '').toLowerCase();
-            const cuiLc = (proposal.cuisine || '').toLowerCase();
-            for (const r of State.rules) {
-                const tLc = (r.target || '').toLowerCase();
-                const hit = r.scope === 'restaurant' ? (tLc && nameLc.includes(tLc)) : (tLc && cuiLc.includes(tLc));
-                if (hit) {
-                    if (r.mode === 'never') return { stance: 'veto', reason: `I'd rather not — ${r.note || 'on my no-go list'}.` };
-                    if (r.mode === 'conditional') return { stance: 'concern', reason: `Only if ${r.condition}.` };
-                }
+        function handle(e) {
+            const p = e.payload || {};
+            if (e.type === 'SYNC') {
+                (p.members || []).forEach(m => { if (m.id !== S.me.id && !S.members.has(m.id)) S.members.set(m.id, { ...m, online: true }); else if (S.members.get(m.id)) { const x = S.members.get(m.id); x.prefs = x.prefs || m.prefs; } });
+                (p.options || []).forEach(o => { if (!findOpt(o.id)) S.options.push({ ...o, reactions: o.reactions || {} }); });
+                renderApp(); autoRespondAll(); return;
             }
-            const avoids = Object.keys(State.profile.cuisines).filter(c => State.profile.cuisines[c] === 'avoid');
-            if (avoids.some(a => cuiLc.includes(a) || nameLc.includes(a))) return { stance: 'veto', reason: `Not keen on ${avoids.find(a => cuiLc.includes(a) || nameLc.includes(a))}.` };
-
-            // Otherwise ask the model to weigh it (with a safe fallback).
-            const schema = { type: 'object', properties: { stance: { type: 'string', enum: ['satisfied', 'concern', 'veto'] }, reason: { type: 'string' } }, required: ['stance', 'reason'] };
-            const prompt = `You answer on behalf of your owner about a restaurant another person suggested for the group.
-YOUR OWNER: ${myTasteSummary()}
-
-SUGGESTED: ${proposal.name} — ${proposal.cuisine || 'unknown cuisine'}, about ${proposal.dist} m away.
-
-Decide your owner's stance: "satisfied" (happy to go), "concern" (would go but has a worry), or "veto" (no). Be true to their tastes, diet, budget and distance limit. Give a short first-person reason.
-Respond ONLY as JSON: {"stance":"satisfied|concern|veto","reason":"one short sentence"}`;
-            const tooFar = proposal.dist > State.radius * 1.4;
-            const fb = { stance: tooFar ? 'concern' : 'satisfied', reason: tooFar ? `A bit far at ${proposal.dist} m.` : `Works for me — sounds good.` };
-            const out = await AI.json(prompt, schema, fb);
-            if (!['satisfied', 'concern', 'veto'].includes(out.stance)) out.stance = fb.stance;
-            return { stance: out.stance, reason: (out.reason || fb.reason).trim() };
-        }
-
-        // My agent answers an open table question (mood / concerns) on my behalf.
-        async function answerQuestion(topic, question, context) {
-            if (topic === 'mood') {
-                const schema = { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] };
-                const prompt = `Speak for your owner in ONE short, friendly sentence. What are they in the mood to eat tonight, and anything to avoid?
-YOUR OWNER: ${myTasteSummary()}
-Respond ONLY as JSON: {"text":"..."}`;
-                const loves = Object.keys(State.profile.cuisines).filter(c => State.profile.cuisines[c] === 'love');
-                const fb = { text: `I'm easy — ${loves.length ? 'leaning ' + loves.slice(0, 2).join(' or ') : 'open to most things'}, up to ${State.profile.budget}.` };
-                return (await AI.json(prompt, schema, fb)).text || fb.text;
+            if (e.type === 'PROPOSE') {
+                (p.options || []).forEach(o => { if (!findOpt(o.id)) S.options.push({ ...o, reactions: o.reactions || {} }); });
+                renderApp(); autoRespondAll(); return;
             }
-            // concerns about the latest proposal
-            const latest = State.proposals.find(p => !p.finalized);
-            if (latest) { const v = await evaluateProposal(latest); return `On ${latest.name}: ${v.stance} — ${v.reason}`; }
-            return `No concerns right now.`;
+            if (e.type === 'REACT') {
+                const o = findOpt(p.optionId); if (!o) return;
+                o.reactions[e.from] = p.r; renderApp(); return;
+            }
+            if (e.type === 'FINALIZE') {
+                const o = findOpt(p.optionId); if (!o || o.won) return;
+                o.won = true; S.options.forEach(x => { if (x.id !== o.id) x.won = false; }); renderApp(); showCelebration(o); return;
+            }
         }
 
-        // ---- organiser actions ----
-        let busy = false;
-        async function runConcierge(extraIntent = '') {
-            if (busy) return; if (!AI.ready) return toast('AI is still warming up…', 'bad');
-            busy = true; $('find-btn').disabled = true;
+        /* ============================ decision logic ============================ */
+        // Aggregate the WHOLE table's preferences so whoever searches considers everyone.
+        function aggregatePrefs() {
+            const mems = liveMembers().map(m => m.prefs).filter(Boolean);
+            const loves = {}, avoids = new Set(), diet = new Set(); let radius = 99999; const budgets = [];
+            mems.forEach(p => {
+                (p.loves || []).forEach(c => { const w = bareWord(c); if (w) loves[w] = (loves[w] || 0) + 1; });
+                (p.avoids || []).forEach(c => { const w = bareWord(c); if (w) avoids.add(w); });
+                (p.diet || []).forEach(d => diet.add(bareWord(d)));
+                if (p.radius) radius = Math.min(radius, p.radius);
+                if (p.budget) budgets.push(p.budget.length);
+            });
+            if (radius === 99999) radius = S.me.radius;
+            const topLoves = Object.entries(loves).sort((a, b) => b[1] - a[1]).map(x => x[0]);
+            return { loves: topLoves, avoids, diet, radius, budget: budgets.length ? Math.min(...budgets) : 2 };
+        }
+        function scoreCandidate(c, agg) {
+            const cu = (c.cuisine || '').toLowerCase(), nm = c.name.toLowerCase();
+            let s = 0;
+            agg.loves.forEach((l, i) => { if (l && (cu.includes(l) || nm.includes(l))) s += Math.max(5 - i, 1) + 3; });
+            if ([...agg.avoids].some(a => a && (cu.includes(a) || nm.includes(a)))) s -= 100;
+            if (agg.diet.has('vegan') && c.vegan) s += 3;
+            if (agg.diet.has('vegetarian') && (c.veg || c.vegan)) s += 2;
+            s -= c.dist / 600;
+            return s;
+        }
+
+        let searching = false;
+        async function findPlaces() {
+            if (searching) return;
+            if (!S.loc) { openSheet('sheet-loc'); return; }
+            searching = true; renderApp();
             try {
-                const loc = await ensureLocation(); if (!loc) return;
-                feedSys(`🔎 Concierge searching near <b>${esc(loc.label || 'you')}</b>…`);
-                const plan = await planSearch(extraIntent);
-                feedTool('search_restaurants', { near: loc.label, cuisines: plan.cuisines, radius: State.radius });
-                let cands = await searchRestaurants(loc.lat, loc.lon, State.radius);
-                cands = filterCandidates(cands, plan.cuisines);
-                if (!cands.length) { feedSys('No fresh options matched — try widening distance or clearing some vetoes.'); toast('No new options found nearby.', 'bad'); return; }
-                const pick = await pickBest(cands.slice(0, 10), extraIntent);
-                await proposeCandidate(cands[pick.choice], pick.pitch);
-            } catch (e) {
-                console.error(e); feedSys(`Search failed: ${esc(e.message)}`); toast('Search failed — check connection.', 'bad');
-            } finally { busy = false; $('find-btn').disabled = false; }
+                const agg = aggregatePrefs();
+                const cands = await fetchNearby(S.loc.lat, S.loc.lon, Math.max(agg.radius, 1200));
+                const have = new Set(S.options.map(o => o.name.toLowerCase()));
+                const ranked = cands
+                    .filter(c => !have.has(c.name.toLowerCase()))
+                    .map(c => ({ c, s: scoreCandidate(c, agg) }))
+                    .filter(x => x.s > -50)
+                    .sort((a, b) => b.s - a.s)
+                    .slice(0, 6)
+                    .map(x => x.c);
+                if (!ranked.length) { toast('No new spots matched — try a wider distance.', 'bad'); return; }
+                const batch = ranked.map(c => ({
+                    id: rid(), name: c.name, cuisine: c.cuisine || prettyKind(c.kind), lat: c.lat, lon: c.lon, dist: c.dist,
+                    address: c.address, by: S.me.id, byName: S.me.name, pitch: pitchFor(c, agg), reactions: {}, won: false
+                }));
+                S.options.push(...batch);
+                Mesh.emit('PROPOSE', { options: batch.map(serOpt) });
+                renderApp();
+                autoRespondAll();
+                haptic(18);
+            } catch (e) { console.error(e); toast(e.message || 'Search failed', 'bad'); }
+            finally { searching = false; renderApp(); }
+        }
+        const prettyKind = k => k === 'cafe' ? 'café' : k === 'fast_food' ? 'fast food' : 'restaurant';
+        function pitchFor(c, agg) {
+            const cu = (c.cuisine || '').toLowerCase();
+            const hit = agg.loves.find(l => l && cu.includes(l));
+            if (hit) return `${cap(hit)} the table loves, ${c.dist}m away.`;
+            return `${c.dist}m away${c.cuisine ? ' · ' + c.cuisine : ''}.`;
+        }
+        const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+
+        // React to options that I haven't reacted to yet (auto mode).
+        let autoBusy = false;
+        async function autoRespondAll() {
+            if (!S.settings.autoRespond || autoBusy) return;
+            autoBusy = true;
+            try {
+                for (const o of S.options) {
+                    if (o.won || o.reactions[S.me.id]) continue;
+                    let v = null;
+                    if (S.settings.ai && AI.available) v = await AI.react(o);
+                    if (!v) v = smartReact(o);
+                    setMyReaction(o, v.r, false);
+                }
+            } finally { autoBusy = false; }
         }
 
-        // Rank candidates: prefer cuisine hints & loves, drop my hard no-gos and anything already on the table.
-        function filterCandidates(cands, cuisineHints = []) {
-            const loves = Object.keys(State.profile.cuisines).filter(c => State.profile.cuisines[c] === 'love');
-            const avoids = Object.keys(State.profile.cuisines).filter(c => State.profile.cuisines[c] === 'avoid');
-            const neverNames = State.rules.filter(r => r.mode === 'never' && r.scope === 'restaurant').map(r => r.target.toLowerCase());
-            const neverCui = State.rules.filter(r => r.mode === 'never' && r.scope === 'cuisine').map(r => r.target.toLowerCase());
-            const onTable = new Set(State.proposals.map(p => p.name.toLowerCase()));
-            const hints = cuisineHints.map(h => h.toLowerCase());
-            return cands.filter(c => {
-                const nm = c.name.toLowerCase(), cu = c.cuisine.toLowerCase();
-                if (onTable.has(nm) || State.vetoedNames.has(nm)) return false;
-                if (neverNames.some(n => n && nm.includes(n))) return false;
-                if (avoids.concat(neverCui).some(a => a && cu.includes(a))) return false;
-                return true;
-            }).map(c => {
-                const cu = c.cuisine.toLowerCase();
-                let score = 0;
-                if (hints.some(h => cu.includes(h) || c.name.toLowerCase().includes(h))) score += 5;
-                if (loves.some(l => cu.includes(l))) score += 3;
-                score -= c.dist / 1000;
-                return { ...c, _score: score };
-            }).sort((a, b) => b._score - a._score);
+        function setMyReaction(o, r, human) {
+            o.reactions[S.me.id] = r;
+            Mesh.emit('REACT', { optionId: o.id, r });
+            renderApp();
+            if (human) haptic();
+        }
+        // Finalising is a deliberate, all-party act: the "Lock it in" button only
+        // appears once EVERY live member is in, and any member may then seal it.
+        function finalizeOption(o) {
+            if (o.won) return;
+            const c = consensusState(o);
+            if (!c.all) { toast('Everyone needs to be in first.', 'bad'); return; }
+            o.won = true; S.options.forEach(x => { if (x.id !== o.id) x.won = false; });
+            Mesh.emit('FINALIZE', { optionId: o.id });
+            renderApp(); showCelebration(o);
         }
 
-        async function proposeCandidate(c, pitch) {
-            const proposal = {
-                id: uid(), name: c.name, cuisine: c.cuisine, dist: c.dist, address: c.address, lat: c.lat, lon: c.lon,
-                pitch: pitch || '', by: Mesh.myId, byName: State.profile.name, verdicts: {}, finalized: false
-            };
-            State.proposals.unshift(proposal);
-            renderProposals();
-            feedSys(`🍴 Your concierge suggests <b>${esc(c.name)}</b>.`);
-            Mesh.emit('PROPOSE', { proposal: serializeProposal(proposal) });
-            // I'm satisfied with my own pick by default, but record it honestly via my evaluator.
-            const v = await evaluateProposal(proposal);
-            setMyVerdict(proposal, v, true);
+        // Consensus = every LIVE member is "in". Decided by all parties.
+        function consensusState(o) {
+            const mems = liveMembers();
+            const ins = mems.filter(m => o.reactions[m.id] === 'in').length;
+            const nos = mems.filter(m => o.reactions[m.id] === 'no').length;
+            const reacted = mems.filter(m => o.reactions[m.id]).length;
+            return { total: mems.length, ins, nos, reacted, all: mems.length >= 1 && ins === mems.length };
+        }
+        function optScore(o) {
+            const mems = liveMembers();
+            let s = 0; mems.forEach(m => { const r = o.reactions[m.id]; if (r === 'in') s += 2; else if (r === 'ok') s += 1; else if (r === 'no') s -= 3; });
+            return s;
+        }
+        function rankedOptions() {
+            return [...S.options].map((o, i) => ({ o, i })).sort((a, b) => {
+                if (a.o.won !== b.o.won) return a.o.won ? -1 : 1;
+                const ds = optScore(b.o) - optScore(a.o); if (ds) return ds;
+                return a.o.dist - b.o.dist;
+            }).map(x => x.o);
         }
 
-        function setMyVerdict(proposal, v, broadcast) {
-            proposal.verdicts[Mesh.myId] = { stance: v.stance, reason: v.reason, name: State.profile.name, emoji: State.profile.emoji };
-            renderProposals();
-            if (broadcast && Mesh.online) Mesh.emit('VERDICT', { proposalId: proposal.id, stance: v.stance, reason: v.reason });
-            if (v.stance !== 'satisfied') feedSys(`Your agent flagged <b>${esc(proposal.name)}</b>: ${esc(v.stance)} — ${esc(v.reason)}`);
-        }
+        /* ============================ rendering ============================ */
+        let CUR = 'app';
+        function render() { S.onboarded && S.me.id ? renderApp() : renderOnboard(); }
 
-        // Manual override of my own stance (the human has the final say over their agent).
-        function setManualStance(proposalId, stance) {
-            const proposal = findProposal(proposalId); if (!proposal) return;
-            const reason = { satisfied: 'I\'m happy with this.', concern: 'I have a slight concern.', veto: 'I\'d rather not.' }[stance];
-            setMyVerdict(proposal, { stance, reason }, true);
-            if (stance === 'veto' || stance === 'concern') { State.vetoedNames.add(proposal.name.toLowerCase()); openOpinion(proposal, stance); }
-        }
+        // ---- onboarding ----
+        let obStep = 0;
+        const OB_STEPS = 4;
+        function renderOnboard() {
+            CUR = 'ob';
+            const joining = !!new URLSearchParams(location.search).get('t');
+            const shell = $('shell');
+            shell.innerHTML = '';
+            const wrap = el('div', 'ob view');
+            // top
+            const top = el('div', 'ob-top');
+            top.innerHTML = `<button class="iconbtn ob-back ${obStep > 0 ? 'show' : ''}" id="ob-back"><svg class="ic" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+                <div class="progress-dots">${Array.from({ length: OB_STEPS }, (_, i) => `<i class="${i <= obStep ? 'on' : ''}"></i>`).join('')}</div>
+                <div style="width:44px"></div>`;
+            wrap.appendChild(top);
+            const body = el('div', 'ob-body');
+            const foot = el('div', 'ob-foot');
+            wrap.appendChild(body); wrap.appendChild(foot);
+            shell.appendChild(wrap);
 
-        function askTable() {
-            if (!Mesh.conns.size) { runMyMood(); return toast('No one connected yet — share your invite link.', 'bad'); }
-            const question = `What's everyone in the mood for tonight, and anything to avoid?`;
-            const askId = uid();
-            Mesh.emit('ASK', { topic: 'mood', askId, question });
-            feedAsk(State.profile.name, State.profile.emoji, question + ' <span style="color:var(--faint)">(asking everyone)</span>');
-            runMyMood();
-        }
-        async function runMyMood() {
-            const text = await answerQuestion('mood');
-            State.peerMoods[Mesh.myId] = `${State.profile.name}: ${text}`;
-            feedAnswer(State.profile.name, State.profile.emoji, text, true);
-        }
-
-        function finalizeProposal(id) {
-            const proposal = findProposal(id); if (!proposal) return;
-            proposal.finalized = true; State.proposals.forEach(x => { if (x.id !== id) x.finalized = false; });
-            renderProposals();
-            Mesh.emit('FINALIZE', { proposalId: id });
-            feedSys(`🎉 You locked in <b>${esc(proposal.name)}</b>. Telling the table…`);
-            toast(`Locked in: ${proposal.name} 🎉`, 'ok');
-        }
-
-        /* ======================================================================
-           RENDERING
-           ====================================================================== */
-        function renderProfile() { $('id-name').textContent = State.profile.name; $('id-ava').textContent = State.profile.emoji || '🙂'; }
-
-        function renderCuisines() {
-            const wrap = $('cuisine-chips'); wrap.innerHTML = '';
-            const all = [...DEFAULT_CUISINES, ...State.profile.extraCuisines];
-            all.forEach(c => {
-                const st = State.profile.cuisines[c]; // undefined | love | avoid
-                const chip = document.createElement('div');
-                chip.className = `chip ${st || ''}`;
-                chip.innerHTML = `${st === 'love' ? '<i class="fa-solid fa-heart"></i>' : st === 'avoid' ? '<i class="fa-solid fa-ban"></i>' : ''} ${esc(c)}`;
-                chip.onclick = () => {
-                    const cur = State.profile.cuisines[c];
-                    if (!cur) State.profile.cuisines[c] = 'love';
-                    else if (cur === 'love') State.profile.cuisines[c] = 'avoid';
-                    else delete State.profile.cuisines[c];
-                    State.save(); renderCuisines();
-                };
-                wrap.appendChild(chip);
-            });
-        }
-        function renderDiet() {
-            const wrap = $('diet-chips'); wrap.innerHTML = '';
-            DIET_TAGS.forEach(d => {
-                const on = State.profile.diet.includes(d);
-                const chip = document.createElement('div');
-                chip.className = `chip ${on ? 'on' : ''}`;
-                chip.textContent = d;
-                chip.onclick = () => {
-                    if (on) State.profile.diet = State.profile.diet.filter(x => x !== d);
-                    else State.profile.diet.push(d);
-                    State.save(); renderDiet();
-                };
-                wrap.appendChild(chip);
-            });
-        }
-        function renderRules() {
-            const list = $('rule-list'); list.innerHTML = '';
-            if (!State.rules.length) { list.innerHTML = `<div class="empty">No rules yet. Add places to avoid, or conditions like "sushi only on payday".</div>`; }
-            State.rules.forEach(r => {
-                const item = document.createElement('div');
-                item.className = `rule-item ${r.mode === 'conditional' ? 'conditional' : ''}`;
-                const ico = r.mode === 'conditional' ? '⚠️' : '🚫';
-                const desc = r.mode === 'conditional' ? `Only if ${esc(r.condition)}` : 'Never suggest';
-                item.innerHTML = `<span class="ri-ico">${ico}</span>
-                    <div class="ri-body"><div class="ri-t">${esc(r.target)} <span style="color:var(--faint);font-weight:400;font-size:.72rem">· ${r.scope}</span></div>
-                    <div class="ri-d">${desc}${r.note ? ' — ' + esc(r.note) : ''}</div></div>
-                    <button class="icon-btn" data-del-rule="${r.id}" style="width:26px;height:26px;font-size:.7rem"><i class="fa-solid fa-xmark"></i></button>`;
-                list.appendChild(item);
-            });
-            $('rule-count').textContent = State.rules.length;
-        }
-        function renderLocation() {
-            $('loc-label').textContent = State.location ? (State.location.label || `${State.location.lat.toFixed(3)}, ${State.location.lon.toFixed(3)}`) : 'Location not set';
-        }
-        function renderPeers() {
-            const list = $('peer-list');
-            list.innerHTML = '';
-            const self = document.createElement('div');
-            self.className = 'peer-card';
-            self.innerHTML = `<span class="pdot self"></span><span class="pe">${esc(State.profile.emoji)}</span>
-                <div class="pmeta"><div class="pn">${esc(State.profile.name)} <span style="color:var(--faint);font-weight:400">· you</span></div><div class="pi">${esc(Mesh.myId || '…')}</div></div>
-                ${State.isHost ? '<span class="ptag">host</span>' : ''}`;
-            list.appendChild(self);
-            [...Mesh.conns.values()].forEach(p => {
-                const card = document.createElement('div');
-                card.className = 'peer-card';
-                card.innerHTML = `<span class="pdot ${p.relayed ? 'relayed' : ''}"></span><span class="pe">${esc(p.emoji || '🙂')}</span>
-                    <div class="pmeta"><div class="pn">${esc(p.name)}</div><div class="pi">${esc(p.conn.peer)}</div></div>`;
-                list.appendChild(card);
-            });
-            const n = Mesh.conns.size;
-            $('peer-count').textContent = n === 0 ? 'just you' : `${n + 1} at the table`;
-        }
-
-        function participantIds() { return [Mesh.myId, ...Mesh.conns.keys()]; }
-        function participantInfo(pid) {
-            if (pid === Mesh.myId) return { name: State.profile.name, emoji: State.profile.emoji };
-            const c = Mesh.conns.get(pid); return c ? { name: c.name, emoji: c.emoji } : { name: pid, emoji: '🙂' };
-        }
-
-        function renderProposals() {
-            const list = $('cand-list');
-            if (!State.proposals.length) {
-                list.innerHTML = `<div class="empty">No options yet. Hit <b>Find a place</b> to search nearby, or tell your concierge what you're craving. Proposals you and your friends make show up here, with everyone's verdict.</div>`;
-                $('cand-count').textContent = 'no options yet'; return;
-            }
-            list.innerHTML = '';
-            State.proposals.forEach(p => list.appendChild(buildCandCard(p)));
-            $('cand-count').textContent = `${State.proposals.length} option${State.proposals.length === 1 ? '' : 's'}`;
-        }
-
-        function buildCandCard(p) {
-            const card = document.createElement('div');
-            card.className = 'cand' + (p.finalized ? ' finalized' : '');
-            const meta = [];
-            if (p.cuisine) meta.push(`<span><i class="fa-solid fa-utensils"></i> ${esc(p.cuisine)}</span>`);
-            meta.push(`<span><i class="fa-solid fa-person-walking"></i> ${p.dist} m</span>`);
-            if (p.address) meta.push(`<span><i class="fa-solid fa-location-dot"></i> ${esc(p.address)}</span>`);
-            const mapsUrl = `https://www.openstreetmap.org/?mlat=${p.lat}&mlon=${p.lon}#map=18/${p.lat}/${p.lon}`;
-
-            // stance chips for every participant
-            const ids = participantIds();
-            const stanceHtml = ids.map(pid => {
-                const v = p.verdicts[pid];
-                const info = participantInfo(pid);
-                const stance = v ? v.stance : 'pending';
-                const face = { satisfied: '😋', concern: '🤔', veto: '🙅', pending: '⏳' }[stance];
-                const reason = v ? v.reason : 'waiting for their agent…';
-                return `<span class="stance ${stance}"><span class="se">${esc(info.emoji)}</span> ${esc(info.name)}${pid === Mesh.myId ? ' (you)' : ''} <span class="se">${face}</span><span class="tip">${esc(reason)}</span></span>`;
-            }).join('');
-
-            const allHappy = ids.every(pid => p.verdicts[pid] && p.verdicts[pid].stance !== 'veto') && ids.every(pid => p.verdicts[pid]);
-            const anyVeto = ids.some(pid => p.verdicts[pid] && p.verdicts[pid].stance === 'veto');
-            const mine = p.by === Mesh.myId;
-
-            let foot = '';
-            if (p.finalized) {
-                foot = `<div class="final-banner"><span class="fb-emoji">🎉</span> Locked in — see you at ${esc(p.name)}!</div>`;
-            } else {
-                const mineStance = p.verdicts[Mesh.myId] ? p.verdicts[Mesh.myId].stance : null;
-                foot = `<div class="c-foot">
-                    <button class="btn btn-sm ${mineStance === 'satisfied' ? '' : 'btn-ghost'}" data-stance="satisfied" data-pid="${p.id}">😋 I'm in</button>
-                    <button class="btn btn-sm ${mineStance === 'concern' ? '' : 'btn-ghost'}" data-stance="concern" data-pid="${p.id}">🤔 Concern</button>
-                    <button class="btn btn-sm ${mineStance === 'veto' ? '' : 'btn-ghost'}" data-stance="veto" data-pid="${p.id}">🙅 No</button>
-                    <span class="grow"></span>
-                    ${mine ? `<button class="btn btn-sm" data-finalize="${p.id}" ${allHappy && !anyVeto ? '' : 'style="opacity:.6"'}><i class="fa-solid fa-circle-check"></i> ${allHappy && !anyVeto ? 'Finalise — all happy!' : 'Finalise anyway'}</button>` : `<span style="font-size:.74rem;color:var(--faint)">${esc(p.byName)}'s pick${allHappy && !anyVeto ? ' · all happy ✓' : ''}</span>`}
+            if (obStep === 0) {
+                body.innerHTML = `<div style="margin:auto 0;text-align:center;width:100%">
+                    <div class="hero-emoji">🍽️</div>
+                    <h1 style="margin-top:22px">Where to<br>eat, together.</h1>
+                    <p class="sub" style="margin:14px auto 0">Share one link. Everyone adds their taste. MatchMeal finds the spot the whole table loves — in seconds.</p>
                 </div>`;
+                foot.innerHTML = `<button class="btn block lg" id="ob-next">${joining ? "Join the table" : "Let's go"}</button>
+                    <div style="text-align:center;color:var(--muted);font-size:.8rem;margin-top:12px">No sign-up · works on any phone</div>`;
             }
+            if (obStep === 1) {
+                body.innerHTML = `<h1>Hi! Who are you?</h1><p class="sub">Just a name your friends will recognise.</p>
+                    <div class="field-label">Your name</div>
+                    <input class="input" id="ob-name" maxlength="20" placeholder="e.g. Mia" value="${esc(S.me.name)}" />
+                    <div class="field-label" style="margin-top:20px">Pick an avatar</div>
+                    <div class="emoji-row" id="ob-emojis">${AVATARS.map(a => `<button class="emoji-pick ${a === S.me.emoji ? 'on' : ''}" data-e="${a}">${a}</button>`).join('')}</div>`;
+                foot.innerHTML = `<button class="btn block lg" id="ob-next">Continue</button>`;
+                setTimeout(() => { const n = $('ob-name'); n && n.focus(); }, 350);
+            }
+            if (obStep === 2) {
+                body.innerHTML = `<h1>What do you love?</h1><p class="sub">Tap to <b style="color:var(--accent)">love</b>, tap again to <b style="color:var(--red)">avoid</b>. Pick a few — you can change anytime.</p>
+                    <div class="chips" id="ob-cuisines">${CUISINES.map(c => chipHtml(c)).join('')}</div>
+                    <div class="field-label" style="margin-top:22px">Any dietary needs?</div>
+                    <div class="chips" id="ob-diet">${DIET.map(d => `<button class="chip ${S.me.diet.includes(d) ? 'on' : ''}" data-d="${esc(d)}"><span class="e">${d.split(' ')[0]}</span> ${d.split(' ').slice(1).join(' ')}</button>`).join('')}</div>`;
+                foot.innerHTML = `<button class="btn block lg" id="ob-next">Continue</button>`;
+            }
+            if (obStep === 3) {
+                const aiOK = AI.available;
+                body.innerHTML = `<h1>How do you<br>want to play?</h1><p class="sub">${aiOK ? 'Your device can run AI on-device — let it react for you, or do it yourself.' : 'Pick how you respond to suggestions. You can switch later.'}</p>
+                    <button class="pick-card ${S.settings.autoRespond ? 'on' : ''}" data-mode="auto">
+                        <div class="pc-ic">⚡</div>
+                        <div style="flex:1"><div class="pc-t">Auto from my taste</div><div class="pc-d">Instantly react to options using my preferences. ${aiOK ? 'Uses on-device AI when helpful.' : 'No AI needed — fast on any phone.'}</div></div>
+                        <div class="pc-check"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div>
+                    </button>
+                    <button class="pick-card ${!S.settings.autoRespond ? 'on' : ''}" data-mode="manual">
+                        <div class="pc-ic">👆</div>
+                        <div style="flex:1"><div class="pc-t">I'll tap myself</div><div class="pc-d">Review each suggestion and react when you want to.</div></div>
+                        <div class="pc-check"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div>
+                    </button>
+                    ${aiOK ? `<div class="toggle-row" style="margin-top:8px"><div class="tx"><div class="tt">Use on-device AI 🧠</div><div class="td">Smarter, nuanced reactions. Stays on your device.</div></div><div class="switch ${S.settings.ai ? 'on' : ''}" id="ob-ai"></div></div>` : ''}`;
+                foot.innerHTML = `<button class="btn block lg" id="ob-next">${joining ? 'Join the table' : 'Create my table'}</button>`;
+            }
+            wireOnboard(joining);
+        }
+        function chipHtml(c) {
+            const state = S.me.loves.includes(c) ? 'love' : S.me.avoids.includes(c) ? 'avoid' : '';
+            return `<button class="chip ${state}" data-c="${esc(c)}"><span class="e">${c.split(' ')[0]}</span> ${c.split(' ').slice(1).join(' ')}</button>`;
+        }
+        function wireOnboard(joining) {
+            const back = $('ob-back'); if (back) back.onclick = () => { if (obStep > 0) { obStep--; renderOnboard(); } };
+            const next = $('ob-next'); if (next) next.onclick = () => obNext(joining);
+            if (obStep === 1) {
+                $('ob-name').oninput = e => S.me.name = e.target.value;
+                $('ob-emojis').onclick = e => { const b = e.target.closest('[data-e]'); if (!b) return; S.me.emoji = b.dataset.e; $('ob-emojis').querySelectorAll('.emoji-pick').forEach(x => x.classList.toggle('on', x === b)); haptic(); };
+            }
+            if (obStep === 2) {
+                $('ob-cuisines').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; cycleCuisine(b.dataset.c); $('ob-cuisines').innerHTML = CUISINES.map(c => chipHtml(c)).join(''); haptic(); };
+                $('ob-diet').onclick = e => { const b = e.target.closest('[data-d]'); if (!b) return; const d = b.dataset.d; S.me.diet.includes(d) ? S.me.diet = S.me.diet.filter(x => x !== d) : S.me.diet.push(d); b.classList.toggle('on'); haptic(); };
+            }
+            if (obStep === 3) {
+                document.querySelectorAll('[data-mode]').forEach(c => c.onclick = () => { S.settings.autoRespond = c.dataset.mode === 'auto'; document.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('on', x === c)); haptic(); });
+                const ai = $('ob-ai'); if (ai) ai.onclick = () => { S.settings.ai = !S.settings.ai; ai.classList.toggle('on', S.settings.ai); haptic(); };
+            }
+        }
+        function cycleCuisine(c) {
+            if (S.me.loves.includes(c)) { S.me.loves = S.me.loves.filter(x => x !== c); S.me.avoids.push(c); }
+            else if (S.me.avoids.includes(c)) { S.me.avoids = S.me.avoids.filter(x => x !== c); }
+            else { S.me.loves.push(c); }
+        }
+        async function obNext(joining) {
+            if (obStep === 1 && !S.me.name.trim()) { S.me.name = 'Guest ' + uid(2); }
+            if (obStep < OB_STEPS - 1) { obStep++; S.save(); renderOnboard(); return; }
+            // finish
+            S.onboarded = true; S.save();
+            await boot();
+        }
 
+        // ---- main app ----
+        function renderApp() {
+            if (CUR !== 'app') CUR = 'app';
+            const shell = $('shell');
+            // build once, then patch board for FLIP smoothness
+            if (!$('app-root')) {
+                shell.innerHTML = '';
+                const root = el('div', 'view'); root.id = 'app-root';
+                root.innerHTML = `
+                    <div class="topbar">
+                        <div class="brand"><div class="logo">🍽️</div><div><div class="tt">MatchMeal</div><div class="ss" id="table-sub">your table</div></div></div>
+                        <div class="statuspill" id="statpill"><span class="live"></span><span id="stat-label">online</span></div>
+                        <button class="iconbtn" id="open-settings"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+                    </div>
+                    <div class="members" id="members"></div>
+                    <div class="locbar" id="locbar"></div>
+                    <div class="find-wrap"><button class="btn block lg" id="find-btn"></button><div class="find-hint" id="find-hint"></div></div>
+                    <div class="sec-h"><h2>On the table</h2><span class="n" id="board-n"></span></div>
+                    <div id="board"></div>
+                    <div class="footnote"><a href="classic.html">classic version</a> · © 2026 woodyhoko</div>`;
+                shell.appendChild(root);
+                $('open-settings').onclick = () => { syncSettingsSheet(); openSheet('sheet-settings'); };
+                $('find-btn').onclick = findPlaces;
+                $('locbar').onclick = () => openSheet('sheet-loc');
+            }
+            // status
+            const np = Mesh.conns.size;
+            $('stat-label').textContent = Mesh.online ? (np ? `${np + 1} here` : 'online') : 'offline';
+            $('statpill').className = 'statuspill' + (Mesh.online ? '' : ' off');
+            $('table-sub').textContent = S.tableHost ? 'joined a table' : (np ? 'you host' : 'tap share to invite');
+            // members + share
+            renderMembers();
+            // location
+            $('locbar').innerHTML = S.loc
+                ? `<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> <b>${esc(S.loc.label)}</b> <span class="chg">change</span>`
+                : `<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> <span style="color:var(--muted)">Set your location to search</span> <span class="chg">set</span>`;
+            // find button
+            $('find-btn').disabled = searching;
+            $('find-btn').innerHTML = searching
+                ? `<svg class="ic" viewBox="0 0 24 24" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.2-8.5"/></svg> Finding great spots…`
+                : `<svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg> ${S.options.length ? 'Find more places' : 'Find places nearby'}`;
+            $('find-hint').textContent = S.options.length ? '' : (np ? "considers everyone's taste at the table" : 'invite friends, then find a place together');
+            // board
+            renderBoard();
+        }
+
+        function renderMembers() {
+            const m = $('members'); const mem = liveMembers();
+            const stack = mem.slice(0, 6).map(x => `<div class="ava ${x.me ? 'me' : ''}" title="${esc(x.name)}">${esc(x.emoji)}<span class="dot ${x.online ? '' : 'off'}"></span></div>`).join('');
+            m.innerHTML = `<div class="ava-stack">${stack}</div><span class="mcount">${mem.length === 1 ? 'just you' : mem.length + ' at the table'}</span>
+                <button class="btn soft share-mini" id="share-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5 8.6 10.5"/></svg> Invite</button>`;
+            $('share-btn').onclick = openShare;
+        }
+
+        // FLIP-animated board so re-ranking glides instead of jumping.
+        function renderBoard() {
+            const board = $('board'); const n = $('board-n');
+            const ranked = rankedOptions();
+            n.textContent = ranked.length ? `${ranked.length}` : '';
+            if (searching && !ranked.length) { board.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>'; return; }
+            if (!ranked.length) {
+                board.innerHTML = `<div class="empty"><span class="be">🍜</span>${Mesh.conns.size ? 'Nothing on the table yet.<br>Hit <b>Find places</b> to load spots everyone can react to.' : 'Invite a friend, set your spot,<br>then find places together.'}</div>`;
+                return;
+            }
+            // FLIP: record old positions
+            const first = {};
+            board.querySelectorAll('.opt').forEach(c => first[c.dataset.id] = c.getBoundingClientRect().top);
+            board.innerHTML = '';
+            ranked.forEach((o, idx) => board.appendChild(optCard(o, idx)));
+            // FLIP: invert + play
+            board.querySelectorAll('.opt').forEach(c => {
+                const last = c.getBoundingClientRect().top; const d = (first[c.dataset.id] ?? last) - last;
+                if (d) { c.style.transform = `translateY(${d}px)`; c.style.transition = 'none'; requestAnimationFrame(() => { c.style.transition = ''; c.style.transform = ''; }); }
+            });
+        }
+
+        function optCard(o, idx) {
+            const c = consensusState(o);
+            const card = el('div', 'opt' + (o.won ? ' won' : (idx === 0 && c.total > 1 ? ' top' : '')));
+            card.dataset.id = o.id;
+            const maps = `https://www.openstreetmap.org/?mlat=${o.lat}&mlon=${o.lon}#map=18/${o.lat}/${o.lon}`;
+            const mem = liveMembers();
+            const tally = mem.map(m => {
+                const r = o.reactions[m.id];
+                const cls = r || 'pending';
+                const face = r === 'in' ? '😋' : r === 'ok' ? '🤔' : r === 'no' ? '🙅' : '⏳';
+                return `<span class="who ${cls}" title="${esc(m.name)}"><span class="fe">${esc(m.emoji)}</span>${face}</span>`;
+            }).join('');
+            const my = o.reactions[S.me.id];
+            const pct = c.total ? Math.round(c.ins / c.total * 100) : 0;
+            const blocked = c.nos > 0;
             card.innerHTML = `
-                <div class="c-head">
-                    <div class="c-ico">🍽️</div>
+                <div class="opt-head">
+                    <div class="opt-ic">${o.won ? '🏆' : (idx === 0 && c.total > 1 ? '🥇' : '🍽️')}${(o.won || (idx === 0 && c.total > 1)) ? `<span class="rankbadge">${o.won ? '✓' : '1'}</span>` : ''}</div>
                     <div style="flex:1;min-width:0">
-                        <div class="c-name">${esc(p.name)}</div>
-                        <div class="c-meta">${meta.join('')}</div>
-                        <div class="c-by">proposed by ${esc(p.byName)}${mine ? ' (you)' : ''} · <a href="${mapsUrl}" target="_blank" rel="noopener">map ↗</a></div>
+                        <div class="opt-tt">${esc(o.name)}</div>
+                        <div class="opt-meta">
+                            ${o.cuisine ? `<span>${esc(o.cuisine)}</span>` : ''}
+                            <span><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg>${o.dist}m</span>
+                            <a href="${maps}" target="_blank" rel="noopener">map ↗</a>
+                        </div>
                     </div>
                 </div>
-                ${p.pitch ? `<div class="c-pitch"><span class="q">“</span>${esc(p.pitch)}<span class="q">”</span></div>` : ''}
-                <div class="stances">${stanceHtml}</div>
-                ${foot}`;
+                ${o.pitch ? `<div class="opt-pitch">${esc(o.pitch)}</div>` : ''}
+                <div class="tally">${tally}</div>
+                ${o.won ? '' : `<div class="consensus"><div class="cbar ${blocked ? 'blocked' : ''}"><i style="width:${blocked ? 100 : pct}%"></i></div>
+                    <div class="clabel">${blocked ? `<b>${c.nos}</b> not keen — needs everyone in` : (c.ins === c.total ? 'everyone\'s in!' : `<b>${c.ins}/${c.total}</b> in · ${c.reacted < c.total ? (c.total - c.reacted) + ' to go' : 'needs everyone'}`)}</div></div>`}
+                ${o.won
+                    ? `<div class="won-foot"><span class="big">🎉</span><span>It's settled — enjoy!</span><a class="go" href="${maps}" target="_blank" rel="noopener">Directions</a></div>`
+                    : `<div class="react">
+                        <button class="rb in ${my === 'in' ? 'sel' : ''}" data-r="in" data-id="${o.id}"><span class="e">😋</span>I'm in</button>
+                        <button class="rb ok ${my === 'ok' ? 'sel' : ''}" data-r="ok" data-id="${o.id}"><span class="e">🤔</span>Meh</button>
+                        <button class="rb no ${my === 'no' ? 'sel' : ''}" data-r="no" data-id="${o.id}"><span class="e">🙅</span>Nope</button>
+                    </div>
+                    ${c.all ? `<button class="btn block lock-btn" data-lock="${o.id}" style="margin-top:11px;background:var(--green);box-shadow:0 10px 24px rgba(22,184,102,.32)"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> ${c.total > 1 ? "Everyone's in — lock it in" : 'Lock this in'}</button>` : ''}`}`;
+            if (!o.won) {
+                card.querySelector('.react').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; const op = findOpt(b.dataset.id); if (op) setMyReaction(op, b.dataset.r, true); };
+                const lock = card.querySelector('[data-lock]');
+                if (lock) lock.onclick = () => { const op = findOpt(o.id); if (op) finalizeOption(op); };
+            }
             return card;
         }
 
-        /* ---- activity feed ---- */
-        const FEED_MAX = 80;
-        function feedPush(kind, icon, html) {
-            const feed = $('feed');
-            if (feed.querySelector('.empty')) feed.innerHTML = '';
-            const el = document.createElement('div');
-            el.className = `fe ${kind}`;
-            el.innerHTML = `<div class="fa-ico"><i class="fa-solid ${icon}"></i></div><div class="fa-body">${html}</div>`;
-            feed.appendChild(el);
-            while (feed.children.length > FEED_MAX) feed.removeChild(feed.firstChild);
-            feed.scrollTop = feed.scrollHeight;
+        /* ============================ sheets ============================ */
+        function openSheet(id) { $('scrim').classList.add('show'); $(id).classList.add('show'); }
+        function closeSheets() { $('scrim').classList.remove('show'); document.querySelectorAll('.sheet').forEach(s => s.classList.remove('show')); }
+        $('scrim').onclick = closeSheets;
+        document.querySelectorAll('.grab').forEach(g => g.onclick = closeSheets);
+
+        function shareUrl() { return `${location.origin}${location.pathname}?t=${S.tableHost || S.me.id}`; }
+        let qrDone = false;
+        function openShare() {
+            const url = shareUrl();
+            $('share-link').textContent = url.replace(/^https?:\/\//, '');
+            const box = $('qrbox'); box.innerHTML = '';
+            try { new QRCode(box, { text: url, width: 168, height: 168, colorDark: '#211611', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M }); }
+            catch (_) { box.innerHTML = '<div style="color:var(--muted);font-size:.85rem">QR unavailable — use the link</div>'; }
+            openSheet('sheet-share');
         }
-        const feedSys = html => feedPush('sys', 'fa-bolt', `${html} <span class="fa-time">· ${ago(now())}</span>`);
-        const feedTool = (name, args) => feedPush('tool', 'fa-screwdriver-wrench', `called <code>${esc(name)}(${esc(JSON.stringify(args))})</code>`);
-        const feedAsk = (who, emoji, html) => feedPush('ask', 'fa-circle-question', `<span class="fa-who">${esc(emoji)} ${esc(who)}</span> ${html}`);
-        const feedAnswer = (who, emoji, text, mine) => feedPush('ask', 'fa-comment-dots', `<span class="fa-who">${esc(emoji)} ${esc(who)}${mine ? ' (your agent)' : ''}</span><div class="bubble">${esc(text)}</div>`);
-        const feedChat = (who, emoji, text) => feedPush('chat', 'fa-comment', `<span class="fa-who">${esc(emoji)} ${esc(who)}</span><div class="bubble">${esc(text)}</div>`);
+        $('share-copy').onclick = () => { navigator.clipboard.writeText(shareUrl()).then(() => toast('Link copied!', 'good')); };
+        $('share-native').onclick = async () => {
+            const url = shareUrl();
+            if (navigator.share) { try { await navigator.share({ title: 'Join my MatchMeal table', text: "Let's pick where to eat — tap to join:", url }); } catch (_) {} }
+            else { navigator.clipboard.writeText(url).then(() => toast('Link copied!', 'good')); }
+        };
 
-        function toast(msg, kind = '') {
-            const el = document.createElement('div');
-            el.className = `toast ${kind}`; el.textContent = msg;
-            $('toast-wrap').appendChild(el);
-            setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 3200);
+        function syncSettingsSheet() {
+            $('sw-ai').className = 'switch' + (S.settings.ai ? ' on' : '') + (AI.available ? '' : ' dis');
+            $('sw-auto').className = 'switch' + (S.settings.autoRespond ? ' on' : '');
+            $('ai-badge').textContent = AI.available ? '' : '(not available here)';
+            $('ai-desc').textContent = AI.available ? 'Your on-device AI reacts to options for you.' : 'Needs Chrome with built-in AI (desktop). You can still auto-react from your taste.';
         }
+        $('sw-ai').onclick = () => { if (!AI.available) { toast('On-device AI isn’t available in this browser.', 'bad'); return; } S.settings.ai = !S.settings.ai; S.save(); syncSettingsSheet(); haptic(); };
+        $('sw-auto').onclick = () => { S.settings.autoRespond = !S.settings.autoRespond; S.save(); syncSettingsSheet(); if (S.settings.autoRespond) autoRespondAll(); haptic(); };
+        $('leave-table').onclick = () => { if (confirm('Start a brand-new empty table? Current options will clear for you.')) { S.options = []; renderApp(); closeSheets(); } };
+        $('edit-taste').onclick = () => { closeSheets(); openTaste(); };
 
-        /* ======================================================================
-           IMPORT / EXPORT
-           ====================================================================== */
-        function exportPrefs() {
-            const blob = new Blob([JSON.stringify(State.exportBundle(), null, 2)], { type: 'application/json' });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `${State.profile.name.replace(/\s+/g, '-').toLowerCase()}.matchmeal.json`;
-            a.click(); URL.revokeObjectURL(a.href);
-            toast('Preferences exported.', 'ok');
+        // taste editor sheet
+        function openTaste() {
+            const cu = $('taste-cuisines'); cu.innerHTML = CUISINES.map(c => chipHtml(c)).join('');
+            cu.onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; cycleCuisine(b.dataset.c); cu.innerHTML = CUISINES.map(c => chipHtml(c)).join(''); haptic(); };
+            const di = $('taste-diet'); di.innerHTML = DIET.map(d => `<button class="chip ${S.me.diet.includes(d) ? 'on' : ''}" data-d="${esc(d)}"><span class="e">${d.split(' ')[0]}</span> ${d.split(' ').slice(1).join(' ')}</button>`).join('');
+            di.onclick = e => { const b = e.target.closest('[data-d]'); if (!b) return; const d = b.dataset.d; S.me.diet.includes(d) ? S.me.diet = S.me.diet.filter(x => x !== d) : S.me.diet.push(d); b.classList.toggle('on'); haptic(); };
+            const bu = $('taste-budget'); bu.innerHTML = BUDGETS.map(([b, l]) => `<button class="opt ${S.me.budget === b ? 'on' : ''}" data-b="${b}">${b}<div style="font-size:.7rem;font-weight:600;color:var(--muted)">${l}</div></button>`).join('');
+            bu.onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; S.me.budget = b.dataset.b; bu.querySelectorAll('.opt').forEach(x => x.classList.toggle('on', x === b)); haptic(); };
+            const ra = $('taste-radius'); ra.innerHTML = RADII.map(([e2, l, v]) => `<button class="opt ${S.me.radius === v ? 'on' : ''}" data-v="${v}">${e2}<div style="font-size:.7rem;font-weight:600;color:var(--muted)">${l}</div></button>`).join('');
+            ra.onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; S.me.radius = +b.dataset.v; ra.querySelectorAll('.opt').forEach(x => x.classList.toggle('on', x === b)); haptic(); };
+            openSheet('sheet-taste');
         }
-        function applyImport(text) {
-            try {
-                State.importBundle(JSON.parse(text));
-                renderAll(); closeModal('import-modal');
-                toast('Preferences imported.', 'ok');
-            } catch (e) { toast('Could not read that file: ' + e.message, 'bad'); }
+        $('taste-save').onclick = () => { S.save(); broadcastPrefs(); closeSheets(); toast('Taste saved & shared with your table', 'good'); renderApp(); };
+        function broadcastPrefs() { if (Mesh.online) Mesh.emit('HELLO', { name: S.me.name, emoji: S.me.emoji, prefs: S.myPrefs(), peers: [...Mesh.conns.keys()] }); }
+
+        // location sheet
+        $('loc-gps').onclick = async () => {
+            $('loc-gps').textContent = 'Locating…';
+            try { const { lat, lon } = await gps(); const label = await reverse(lat, lon); S.loc = { lat, lon, label }; S.save(); closeSheets(); toast('Location set: ' + label, 'good'); renderApp(); }
+            catch (_) { toast('Could not get location — type a place instead.', 'bad'); }
+            $('loc-gps').innerHTML = `<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> Use my current location`;
+        };
+        $('loc-find').onclick = async () => {
+            const q = $('loc-q').value.trim(); if (!q) return;
+            $('loc-result').innerHTML = '<div style="color:var(--muted);font-size:.9rem;padding:6px 2px">Searching…</div>';
+            try { const r = await geocode(q); $('loc-result').innerHTML = `<button class="pick-card on" id="loc-use"><div class="pc-ic">📍</div><div style="flex:1"><div class="pc-t">${esc(r.label)}</div><div class="pc-d">Tap to use this</div></div></button>`; $('loc-use').onclick = () => { S.loc = r; S.save(); closeSheets(); toast('Location set', 'good'); renderApp(); }; }
+            catch (_) { $('loc-result').innerHTML = '<div style="color:var(--red);font-size:.9rem;padding:6px 2px">Couldn’t find that place.</div>'; }
+        };
+
+        /* ============================ celebration ============================ */
+        function showCelebration(o) {
+            $('cele-name').textContent = o.name;
+            const c = consensusState(o);
+            $('cele-sub').textContent = c.total > 1 ? `All ${c.total} of you are in. Time to eat!` : 'Locked in. Time to eat!';
+            $('cele-go').onclick = () => window.open(`https://www.openstreetmap.org/?mlat=${o.lat}&mlon=${o.lon}#map=18/${o.lat}/${o.lon}`, '_blank');
+            $('celebrate').classList.add('show');
+            confetti(); haptic(40);
         }
+        $('cele-close').onclick = () => { $('celebrate').classList.remove('show'); };
 
-        function renderAll() {
-            renderProfile(); renderCuisines(); renderDiet(); renderRules(); renderLocation(); renderPeers(); renderProposals();
-            $('budget').value = State.profile.budget;
-            $('radius').value = State.radius;
-            $('notes').value = State.profile.notes || '';
-            $('role-host').checked = State.isHost;
-        }
-
-        /* ======================================================================
-           MODALS + WIRING
-           ====================================================================== */
-        function openModal(id) { $(id).classList.add('show'); }
-        function closeModal(id) { $(id).classList.remove('show'); }
-
-        let opinionCtx = null;
-        function openOpinion(proposal, stance) {
-            opinionCtx = { proposal, stance, op: 'never' };
-            $('opinion-ctx').innerHTML = `You weren't keen on <b>${esc(proposal.name)}</b>${proposal.cuisine ? ' (' + esc(proposal.cuisine) + ')' : ''}. Want your AI to remember so it stops suggesting it?`;
-            $('opinion-seg').querySelectorAll('.opt').forEach(o => o.classList.toggle('active', o.dataset.op === 'never'));
-            $('opinion-cond-field').style.display = 'none';
-            $('opinion-condition').value = ''; $('opinion-note').value = '';
-            openModal('opinion-modal');
-        }
-
-        function wire() {
-            // profile
-            $('edit-profile').onclick = () => { $('pf-name').value = State.profile.name; $('pf-emoji').value = State.profile.emoji; openModal('profile-modal'); };
-            $('pf-save').onclick = () => {
-                State.profile.name = $('pf-name').value.trim() || randomName();
-                State.profile.emoji = $('pf-emoji').value.trim() || '🙂';
-                State.save(); renderProfile(); renderPeers(); closeModal('profile-modal'); toast('Profile saved.', 'ok');
-            };
-            $('copy-id').onclick = () => navigator.clipboard.writeText(Mesh.myId || '').then(() => toast('Your id is copied.', 'ok'));
-            $('share-btn').onclick = () => {
-                const link = `${location.origin}${location.pathname}?join=${Mesh.myId || ''}`;
-                navigator.clipboard.writeText(link).then(() => toast('Invite link copied — send it to a friend.', 'ok'));
-            };
-            $('join-btn').onclick = () => {
-                const id = $('join-id').value.trim(); if (!id) return toast('Paste a friend\'s id first.', 'bad');
-                Mesh.connectTo(id); toast(`Connecting to ${id}…`); $('join-id').value = '';
-            };
-            $('role-host').onchange = e => { State.isHost = e.target.checked; State.save(); updateMeshStat(); renderPeers(); if (State.isHost && Mesh.peer && Mesh.peer.disconnected) { try { Mesh.peer.reconnect(); } catch (_) { } } };
-
-            // taste
-            $('budget').onchange = e => { State.profile.budget = e.target.value; State.save(); };
-            $('radius').onchange = e => { State.radius = parseInt(e.target.value, 10); State.save(); };
-            $('notes').oninput = e => { State.profile.notes = e.target.value; State.save(); };
-            $('add-cuisine').onclick = () => { $('cuisine-new').value = ''; openModal('cuisine-modal'); };
-            $('cuisine-add-save').onclick = () => {
-                const c = $('cuisine-new').value.trim().toLowerCase(); if (!c) return;
-                if (!DEFAULT_CUISINES.includes(c) && !State.profile.extraCuisines.includes(c)) State.profile.extraCuisines.push(c);
-                State.profile.cuisines[c] = 'love'; State.save(); renderCuisines(); closeModal('cuisine-modal');
-            };
-
-            // rules
-            let ruleScope = 'restaurant', ruleMode = 'never';
-            $('add-rule').onclick = () => { ruleScope = 'restaurant'; ruleMode = 'never'; $('rule-target').value = ''; $('rule-condition').value = ''; $('rule-note').value = ''; syncRuleSeg(); $('rule-cond-field').style.display = 'none'; openModal('rule-modal'); };
-            function syncRuleSeg() {
-                $('rule-scope-seg').querySelectorAll('.opt').forEach(o => o.classList.toggle('active', o.dataset.scope === ruleScope));
-                $('rule-mode-seg').querySelectorAll('.opt').forEach(o => o.classList.toggle('active', o.dataset.mode === ruleMode));
-            }
-            $('rule-scope-seg').onclick = e => { const o = e.target.closest('[data-scope]'); if (!o) return; ruleScope = o.dataset.scope; syncRuleSeg(); };
-            $('rule-mode-seg').onclick = e => { const o = e.target.closest('[data-mode]'); if (!o) return; ruleMode = o.dataset.mode; $('rule-cond-field').style.display = ruleMode === 'conditional' ? 'block' : 'none'; syncRuleSeg(); };
-            $('rule-save').onclick = () => {
-                const target = $('rule-target').value.trim(); if (!target) return toast('What is the rule about?', 'bad');
-                if (ruleMode === 'conditional' && !$('rule-condition').value.trim()) return toast('Add the condition.', 'bad');
-                State.rules.unshift({ id: uid(), scope: ruleScope, target, mode: ruleMode, condition: $('rule-condition').value.trim(), note: $('rule-note').value.trim() });
-                State.save(); renderRules(); closeModal('rule-modal'); toast('Rule saved — your AI will honour it.', 'ok');
-            };
-            $('rule-list').addEventListener('click', e => {
-                const d = e.target.closest('[data-del-rule]'); if (d) { State.rules = State.rules.filter(r => r.id !== d.dataset.delRule); State.save(); renderRules(); }
-            });
-
-            // concierge
-            $('find-btn').onclick = () => runConcierge('');
-            $('ask-table-btn').onclick = askTable;
-            const ci = $('concierge-input');
-            const grow = el => { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 140) + 'px'; };
-            ci.addEventListener('input', () => grow(ci));
-            const sendConcierge = () => { const t = ci.value.trim(); if (!t) return; feedChat(State.profile.name, State.profile.emoji, t); ci.value = ''; grow(ci); runConcierge(t); };
-            $('concierge-send').onclick = sendConcierge;
-            ci.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendConcierge(); } });
-
-            // candidate actions (event delegation)
-            $('cand-list').addEventListener('click', e => {
-                const st = e.target.closest('[data-stance]'), fin = e.target.closest('[data-finalize]');
-                if (st) setManualStance(st.dataset.pid, st.dataset.stance);
-                if (fin) finalizeProposal(fin.dataset.finalize);
-            });
-
-            // table chat
-            const chat = $('chat-input');
-            chat.addEventListener('input', () => grow(chat));
-            const sendChat = () => { const t = chat.value.trim(); if (!t) return; feedChat(State.profile.name, State.profile.emoji, t); Mesh.emit('CHAT', { text: t }); chat.value = ''; grow(chat); };
-            $('chat-send').onclick = sendChat;
-            chat.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat(); } });
-            $('clear-feed').onclick = () => { $('feed').innerHTML = '<div class="empty">Cleared.</div>'; };
-
-            // location
-            $('loc-set').onclick = () => { State.location = null; ensureLocation(); };
-            $('loc-manual').onclick = () => { if (State.location) { $('loc-lat').value = State.location.lat; $('loc-lon').value = State.location.lon; } openModal('loc-modal'); };
-            $('loc-lookup').onclick = async () => {
-                const q = $('loc-query').value.trim(); if (!q) return;
-                try { const r = await geocode(q); $('loc-lat').value = r.lat; $('loc-lon').value = r.lon; $('loc-query').dataset.label = r.label; toast('Found: ' + r.label, 'ok'); }
-                catch (e) { toast(e.message, 'bad'); }
-            };
-            $('loc-save').onclick = () => {
-                const lat = parseFloat($('loc-lat').value), lon = parseFloat($('loc-lon').value);
-                if (!Number.isFinite(lat) || !Number.isFinite(lon)) return toast('Enter valid coordinates.', 'bad');
-                State.location = { lat, lon, label: $('loc-query').dataset.label || `${lat.toFixed(3)}, ${lon.toFixed(3)}`, ts: now() };
-                State.save(); renderLocation(); closeModal('loc-modal'); toast('Location set.', 'ok');
-            };
-
-            // opinion (store dissatisfaction as a preference)
-            $('opinion-seg').onclick = e => { const o = e.target.closest('[data-op]'); if (!o || !opinionCtx) return; opinionCtx.op = o.dataset.op; $('opinion-seg').querySelectorAll('.opt').forEach(x => x.classList.toggle('active', x === o)); $('opinion-cond-field').style.display = o.dataset.op === 'conditional' ? 'block' : 'none'; };
-            $('opinion-save').onclick = () => {
-                if (!opinionCtx) return; const p = opinionCtx.proposal;
-                const note = $('opinion-note').value.trim();
-                if (opinionCtx.op === 'cuisine' && p.cuisine) { const c = p.cuisine.split(' ')[0].toLowerCase(); State.profile.cuisines[c] = 'avoid'; if (!DEFAULT_CUISINES.includes(c) && !State.profile.extraCuisines.includes(c)) State.profile.extraCuisines.push(c); }
-                else if (opinionCtx.op === 'conditional') State.rules.unshift({ id: uid(), scope: 'restaurant', target: p.name, mode: 'conditional', condition: $('opinion-condition').value.trim() || 'a special occasion', note });
-                else State.rules.unshift({ id: uid(), scope: 'restaurant', target: p.name, mode: 'never', condition: '', note });
-                State.save(); renderRules(); renderCuisines(); closeModal('opinion-modal'); toast('Saved — your AI will remember.', 'ok');
-            };
-
-            // import / export
-            $('export-btn').onclick = exportPrefs;
-            $('import-btn').onclick = () => { $('import-text').value = ''; openModal('import-modal'); };
-            $('import-file-btn').onclick = () => $('import-file').click();
-            $('import-file').onchange = e => { const f = e.target.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => applyImport(rd.result); rd.readAsText(f); };
-            $('import-apply').onclick = () => { const t = $('import-text').value.trim(); if (!t) return toast('Paste JSON or choose a file.', 'bad'); applyImport(t); };
-
-            // reset
-            $('reset-link').onclick = () => { if (confirm('Forget your profile, rules and location on this device?')) { ['mm_profile', 'mm_rules', 'mm_location', 'mm_radius', 'mm_host'].forEach(k => localStorage.removeItem(k)); location.reload(); } };
-
-            // modal close
-            document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => closeModal(b.dataset.close));
-            document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) closeModal(o.id); }));
+        function confetti() {
+            const cv = $('confetti'); cv.classList.add('show');
+            const ctx = cv.getContext('2d'); const W = cv.width = innerWidth, H = cv.height = innerHeight;
+            const cols = ['#ff5a36', '#ff9e2c', '#16b866', '#f0506a', '#5b8def', '#ffd166'];
+            const P = Array.from({ length: 140 }, () => ({ x: W / 2 + (Math.random() - .5) * 120, y: H * .38, vx: (Math.random() - .5) * 14, vy: Math.random() * -16 - 4, g: .4 + Math.random() * .3, s: 5 + Math.random() * 7, c: cols[Math.floor(Math.random() * cols.length)], r: Math.random() * 6, vr: (Math.random() - .5) * .4 }));
+            let t = 0;
+            (function tick() {
+                ctx.clearRect(0, 0, W, H); t++;
+                P.forEach(p => { p.vy += p.g; p.x += p.vx; p.y += p.vy; p.r += p.vr; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * .6); ctx.restore(); });
+                if (t < 160) requestAnimationFrame(tick); else { ctx.clearRect(0, 0, W, H); cv.classList.remove('show'); }
+            })();
         }
 
-        /* ======================================================================
-           BOOTSTRAP
-           ====================================================================== */
-        async function bootApp() {
-            State.load();
-            renderAll();
-            wire();
-
-            const chip = $('top-backend'), lbl = $('top-backend-label');
-            if (AI.backend === 'chrome') { chip.className = 'backend-chip ok'; lbl.textContent = 'Chrome built-in AI'; }
-            else { chip.className = 'backend-chip gemma'; lbl.textContent = 'On-device Gemma'; }
-
-            $('loader').style.display = 'none';
-            $('app').style.display = 'block';
-
-            try {
-                const id = await Mesh.start();
-                $('id-pid').textContent = id; renderPeers(); updateMeshStat();
-                feedSys('You\'re online. Share your invite link to bring friends to the table.');
-            } catch (e) { console.error(e); $('id-pid').textContent = 'offline'; toast('Could not reach the signalling broker.', 'bad'); }
-
-            // auto-join via ?join=<id>
-            const params = new URLSearchParams(location.search);
-            if (params.get('join')) { $('join-id').value = params.get('join'); $('role-host').checked = State.isHost; setTimeout(() => $('join-btn').click(), 800); }
+        /* ============================ boot ============================ */
+        async function boot() {
+            // bring my node online
+            try { await Mesh.start(); } catch (e) { console.error(e); }
+            // auto-join a table from the link
+            const t = new URLSearchParams(location.search).get('t');
+            if (t && t !== S.me.id) { S.tableHost = t; setTimeout(() => Mesh.connect(t), 600); }
+            render();
+            // share prompt for fresh hosts
+            if (!t) setTimeout(() => { if (!Mesh.conns.size) openShare(); }, 700);
         }
 
         async function init() {
-            const backend = await AI.detect();
-            const chip = $('backend-chip'), label = $('backend-label');
-            const action = $('gate-action'), note = $('gate-note'), sub = $('gate-sub');
-            if (backend === 'chrome') {
-                chip.className = 'backend-chip ok';
-                label.textContent = 'Chrome built-in AI detected';
-                note.innerHTML = 'Your browser has the built-in <b>Prompt API</b>, so your concierge reasons entirely on-device. Your tastes never leave your machine — only the verdicts you choose to share.';
-                sub.textContent = "Powered by Chrome's built-in language model.";
-                AI.ready = true;
-            } else {
-                chip.className = 'backend-chip gemma';
-                label.textContent = 'No built-in AI — using Gemma';
-                note.innerHTML = 'No built-in AI found, so your concierge runs Google <b>Gemma</b> locally via WebGPU. First run is a one-time <b>≈ 2 GB</b> download, cached for next time.';
-                sub.textContent = 'Needs Chrome or Edge with WebGPU. Downloads only when you continue.';
-            }
-            action.style.display = 'block';
-
-            $('enter-btn').onclick = async () => {
-                if (backend === 'gemma') {
-                    action.style.display = 'none';
-                    $('gate-loading').style.display = 'block';
-                    try { await loadGemma(); AI.ready = true; }
-                    catch (e) { console.error(e); $('loader-message').textContent = 'Could not load Gemma: ' + e.message; return; }
-                }
-                bootApp();
-            };
+            S.load();
+            // Render immediately so a slow AI probe can never blank the screen.
+            if (S.onboarded) boot(); else { obStep = 0; renderOnboard(); }
+            // Detect on-device AI in the background, then refresh AI-dependent UI.
+            AI.detect().then(() => {
+                if (!AI.available) S.settings.ai = false;
+                if (CUR === 'ob' && obStep === 3) renderOnboard();
+            }).catch(() => {});
         }
-
         document.addEventListener('DOMContentLoaded', init);
         if (document.readyState !== 'loading') init();
+        addEventListener('resize', () => { if (CUR === 'app' && $('confetti').classList.contains('show')) { $('confetti').width = innerWidth; $('confetti').height = innerHeight; } });
     </script>
 </body>
 
