@@ -416,15 +416,9 @@
     <div class="sheet" id="sheet-settings">
         <div class="grab"></div>
         <h3>Your settings</h3>
-        <p class="sub">Choose how you join the decision. Everything stays on your device.</p>
-        <div class="toggle-row">
-            <div class="tx"><div class="tt">Let AI represent me <span id="ai-badge" style="font-size:.7rem;color:var(--muted)"></span></div><div class="td" id="ai-desc">Your on-device AI reacts to options for you.</div></div>
-            <div class="switch" id="sw-ai"></div>
-        </div>
-        <div class="toggle-row">
-            <div class="tx"><div class="tt">Auto-respond to new options</div><div class="td">React automatically from your taste the moment an option is proposed.</div></div>
-            <div class="switch" id="sw-auto"></div>
-        </div>
+        <p class="sub">Choose how you respond to options. Everything stays on your device.</p>
+        <div class="field-label">How you respond</div>
+        <div id="mode-pick"></div>
         <button class="btn ghost block" id="edit-taste" style="margin-top:18px"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Edit my taste</button>
         <button class="btn soft block" id="leave-table" style="margin-top:10px">Start a fresh table</button>
         <div class="footnote">MatchMeal · © 2026 woodyhoko</div>
@@ -500,7 +494,7 @@
         /* ============================ state ============================ */
         const S = {
             me: { id: null, name: '', emoji: '😀', loves: [], avoids: [], diet: [], budget: '$$', radius: 2500 },
-            settings: { ai: false, autoRespond: true },
+            settings: { mode: 'taste' }, // 'manual' | 'taste' | 'ai'
             loc: null,                 // {lat, lon, label}
             onboarded: false,
             tableHost: null,           // host id we joined (null if I'm host)
@@ -512,6 +506,8 @@
                 try {
                     const p = JSON.parse(localStorage.getItem('mm2_me') || 'null'); if (p) this.me = { ...this.me, ...p };
                     const s = JSON.parse(localStorage.getItem('mm2_set') || 'null'); if (s) this.settings = { ...this.settings, ...s };
+                    // migrate legacy {ai, autoRespond} -> {mode}
+                    if (s && !s.mode) this.settings.mode = (s.autoRespond === false) ? 'manual' : (s.ai ? 'ai' : 'taste');
                     const l = JSON.parse(localStorage.getItem('mm2_loc') || 'null'); if (l) this.loc = l;
                     this.onboarded = localStorage.getItem('mm2_onb') === '1';
                 } catch (_) {}
@@ -761,13 +757,13 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
         // React to options that I haven't reacted to yet (auto mode).
         let autoBusy = false;
         async function autoRespondAll() {
-            if (!S.settings.autoRespond || autoBusy) return;
+            if (S.settings.mode === 'manual' || autoBusy) return;
             autoBusy = true;
             try {
                 for (const o of S.options) {
                     if (o.won || o.reactions[S.me.id]) continue;
                     let v = null;
-                    if (S.settings.ai && AI.available) v = await AI.react(o);
+                    if (S.settings.mode === 'ai' && AI.available) v = await AI.react(o);
                     if (!v) v = smartReact(o);
                     setMyReaction(o, v.r, false);
                 }
@@ -862,19 +858,8 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
                 foot.innerHTML = `<button class="btn block lg" id="ob-next">Continue</button>`;
             }
             if (obStep === 3) {
-                const aiOK = AI.available;
-                body.innerHTML = `<h1>How do you<br>want to play?</h1><p class="sub">${aiOK ? 'Your device can run AI on-device — let it react for you, or do it yourself.' : 'Pick how you respond to suggestions. You can switch later.'}</p>
-                    <button class="pick-card ${S.settings.autoRespond ? 'on' : ''}" data-mode="auto">
-                        <div class="pc-ic">⚡</div>
-                        <div style="flex:1"><div class="pc-t">Auto from my taste</div><div class="pc-d">Instantly react to options using my preferences. ${aiOK ? 'Uses on-device AI when helpful.' : 'No AI needed — fast on any phone.'}</div></div>
-                        <div class="pc-check"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div>
-                    </button>
-                    <button class="pick-card ${!S.settings.autoRespond ? 'on' : ''}" data-mode="manual">
-                        <div class="pc-ic">👆</div>
-                        <div style="flex:1"><div class="pc-t">I'll tap myself</div><div class="pc-d">Review each suggestion and react when you want to.</div></div>
-                        <div class="pc-check"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div>
-                    </button>
-                    ${aiOK ? `<div class="toggle-row" style="margin-top:8px"><div class="tx"><div class="tt">Use on-device AI 🧠</div><div class="td">Smarter, nuanced reactions. Stays on your device.</div></div><div class="switch ${S.settings.ai ? 'on' : ''}" id="ob-ai"></div></div>` : ''}`;
+                body.innerHTML = `<h1>How do you<br>want to play?</h1><p class="sub">${AI.available ? 'Your device can run AI on-device — let it represent you, or do it yourself. Switch anytime.' : 'Pick how you respond to suggestions. You can switch anytime.'}</p>
+                    <div id="ob-mode">${modeCardsHtml(S.settings.mode)}</div>`;
                 foot.innerHTML = `<button class="btn block lg" id="ob-next">${joining ? 'Join the table' : 'Create my table'}</button>`;
             }
             wireOnboard(joining);
@@ -895,8 +880,7 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
                 $('ob-diet').onclick = e => { const b = e.target.closest('[data-d]'); if (!b) return; const d = b.dataset.d; S.me.diet.includes(d) ? S.me.diet = S.me.diet.filter(x => x !== d) : S.me.diet.push(d); b.classList.toggle('on'); haptic(); };
             }
             if (obStep === 3) {
-                document.querySelectorAll('[data-mode]').forEach(c => c.onclick = () => { S.settings.autoRespond = c.dataset.mode === 'auto'; document.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('on', x === c)); haptic(); });
-                const ai = $('ob-ai'); if (ai) ai.onclick = () => { S.settings.ai = !S.settings.ai; ai.classList.toggle('on', S.settings.ai); haptic(); };
+                wireModePick($('ob-mode'), () => S.settings.mode, m => { S.settings.mode = m; });
             }
         }
         function cycleCuisine(c) {
@@ -1067,14 +1051,36 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
             else { navigator.clipboard.writeText(url).then(() => toast('Link copied!', 'good')); }
         };
 
-        function syncSettingsSheet() {
-            $('sw-ai').className = 'switch' + (S.settings.ai ? ' on' : '') + (AI.available ? '' : ' dis');
-            $('sw-auto').className = 'switch' + (S.settings.autoRespond ? ' on' : '');
-            $('ai-badge').textContent = AI.available ? '' : '(not available here)';
-            $('ai-desc').textContent = AI.available ? 'Your on-device AI reacts to options for you.' : 'Needs Chrome with built-in AI (desktop). You can still auto-react from your taste.';
+        // One clear control instead of two interdependent toggles.
+        const MODES = [
+            { key: 'manual', ico: '👆', t: "I'll tap myself", d: 'Review each option and react when you want.' },
+            { key: 'taste', ico: '⚡', t: 'Auto from my taste', d: 'React instantly from your preferences — no AI, works on any phone.' },
+            { key: 'ai', ico: '🧠', t: 'Auto with on-device AI', d: 'Smarter, nuanced reactions. Stays on your device.' }
+        ];
+        function modeCardsHtml(sel) {
+            return MODES.map(m => {
+                const dis = m.key === 'ai' && !AI.available;
+                return `<button class="pick-card ${sel === m.key ? 'on' : ''}" data-mode="${m.key}"${dis ? ' data-dis="1" style="opacity:.55"' : ''}>
+                    <div class="pc-ic">${m.ico}</div>
+                    <div style="flex:1"><div class="pc-t">${m.t}${dis ? ' <span style="font-size:.72rem;font-weight:600;color:var(--muted)">(needs Chrome AI)</span>' : ''}</div><div class="pc-d">${m.d}</div></div>
+                    <div class="pc-check"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div>
+                </button>`;
+            }).join('');
         }
-        $('sw-ai').onclick = () => { if (!AI.available) { toast('On-device AI isn’t available in this browser.', 'bad'); return; } S.settings.ai = !S.settings.ai; S.save(); syncSettingsSheet(); haptic(); };
-        $('sw-auto').onclick = () => { S.settings.autoRespond = !S.settings.autoRespond; S.save(); syncSettingsSheet(); if (S.settings.autoRespond) autoRespondAll(); haptic(); };
+        function wireModePick(container, getSel, setSel) {
+            if (!container) return;
+            container.innerHTML = modeCardsHtml(getSel());
+            container.onclick = e => {
+                const b = e.target.closest('[data-mode]'); if (!b) return;
+                if (b.dataset.dis) { toast('On-device AI needs Chrome with built-in AI.', 'bad'); return; }
+                setSel(b.dataset.mode);
+                container.innerHTML = modeCardsHtml(getSel());
+                haptic();
+            };
+        }
+        function syncSettingsSheet() {
+            wireModePick($('mode-pick'), () => S.settings.mode, m => { S.settings.mode = m; S.save(); if (m !== 'manual') autoRespondAll(); });
+        }
         $('leave-table').onclick = () => { if (confirm('Start a brand-new empty table? Current options will clear for you.')) { S.options = []; renderApp(); closeSheets(); } };
         $('edit-taste').onclick = () => { closeSheets(); openTaste(); };
 
@@ -1149,7 +1155,7 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
             if (S.onboarded) boot(); else { obStep = 0; renderOnboard(); }
             // Detect on-device AI in the background, then refresh AI-dependent UI.
             AI.detect().then(() => {
-                if (!AI.available) S.settings.ai = false;
+                if (!AI.available && S.settings.mode === 'ai') S.settings.mode = 'taste';
                 if (CUR === 'ob' && obStep === 3) renderOnboard();
             }).catch(() => {});
         }
