@@ -1,0 +1,1107 @@
+<!-- ===================================================================
+     MatchMeal — Table (v2)
+     A ground-up, mobile-first redesign of the MatchMeal experience.
+     • Minimalist, share-first, onboarding in seconds.
+     • AI is OPTIONAL: Chrome's built-in Prompt API can represent a user
+       automatically; everyone else simply shares their preferences and
+       taps — no model, no download, fully usable on a low-end phone.
+     • Everyone's preferences reach the whole table, so whoever searches
+       considers the WHOLE group. Options are ranked by the group's rating,
+       and a place is locked in only when EVERY member is in.
+
+     Copyright (c) 2026 woodyhoko. All Rights Reserved.
+     This source is provided for viewing only. No license is granted to use,
+     copy, modify, distribute, host, or create derivative works of any part
+     of it without the prior express written permission of the copyright
+     holder. See the LICENSE file. Do not remove this notice.
+     ================================================================== -->
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
+    <meta name="theme-color" content="#fff7f0" />
+    <title>MatchMeal — pick a place, together</title>
+    <meta name="description" content="Decide where to eat, together. Share a link, everyone adds their taste, and MatchMeal finds the place the whole table loves." />
+    <meta name="author" content="woodyhoko" />
+    <meta name="copyright" content="Copyright (c) 2026 woodyhoko. All Rights Reserved." />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #fff7f0;
+            --bg-2: #ffeede;
+            --card: #ffffff;
+            --ink: #211611;
+            --ink-2: #5d4f46;
+            --muted: #948578;
+            --faint: #c9bcb0;
+            --line: #f1e6da;
+            --line-2: #ece0d3;
+            --accent: #ff5a36;
+            --accent-press: #ec4322;
+            --accent-soft: #fff0eb;
+            --amber: #ff9e2c;
+            --green: #16b866;
+            --green-soft: #e7f8ef;
+            --yellow: #f5a524;
+            --yellow-soft: #fdf2dd;
+            --red: #f0506a;
+            --red-soft: #fdebee;
+            --shadow-sm: 0 2px 8px rgba(80, 40, 20, .06);
+            --shadow: 0 12px 34px rgba(120, 60, 30, .12);
+            --shadow-lg: 0 24px 60px rgba(120, 60, 30, .2);
+            --r: 22px;
+            --r-sm: 14px;
+            --font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+            --ease: cubic-bezier(.22, 1, .36, 1);
+            --shell: 480px;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #17110d; --bg-2: #1f1611; --card: #241a14; --ink: #f7ede4; --ink-2: #d8c6b8;
+                --muted: #ab9889; --faint: #6f5f53; --line: #34271f; --line-2: #3d2e25;
+                --accent-soft: #36211a; --green-soft: #14271d; --yellow-soft: #2b2113; --red-soft: #301a1d;
+                --shadow-sm: 0 2px 8px rgba(0,0,0,.3); --shadow: 0 12px 34px rgba(0,0,0,.45); --shadow-lg: 0 24px 60px rgba(0,0,0,.55);
+            }
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { margin: 0; height: 100%; }
+        body {
+            background: var(--bg);
+            color: var(--ink);
+            font-family: var(--font);
+            -webkit-font-smoothing: antialiased;
+            overscroll-behavior-y: none;
+        }
+        body::before {
+            content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+            background:
+                radial-gradient(60vw 50vh at 80% -10%, rgba(255, 158, 44, .18), transparent 60%),
+                radial-gradient(70vw 50vh at -10% 0%, rgba(255, 90, 54, .14), transparent 55%),
+                radial-gradient(80vw 60vh at 50% 120%, rgba(255, 90, 54, .1), transparent 60%);
+        }
+
+        button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+        input, textarea, select { font-family: inherit; }
+        a { color: var(--accent); }
+        .ic { width: 1.25em; height: 1.25em; display: inline-block; vertical-align: -.18em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        /* ---------------- App shell (phone-sized, centered) ---------------- */
+        #shell {
+            width: 100%; max-width: var(--shell); margin: 0 auto; min-height: 100dvh;
+            display: flex; flex-direction: column; position: relative;
+            padding: 0 16px calc(env(safe-area-inset-bottom) + 18px);
+        }
+        @media (min-width: 540px) {
+            #shell { box-shadow: var(--shadow-lg); background: var(--bg); border-radius: 34px; margin-top: 20px; margin-bottom: 20px; min-height: calc(100dvh - 40px); overflow: hidden; padding-bottom: 22px; }
+            body { padding: 0; }
+        }
+
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes pop { 0% { transform: scale(.8); opacity: 0 } 60% { transform: scale(1.06) } 100% { transform: scale(1); opacity: 1 } }
+        @keyframes sheetUp { from { transform: translateY(102%); } to { transform: translateY(0); } }
+        @keyframes spin { to { transform: rotate(360deg) } }
+        @keyframes pulse { 0%,100% { transform: scale(1); opacity: 1 } 50% { transform: scale(1.9); opacity: 0 } }
+        @keyframes shimmer { 100% { background-position: 200% 0 } }
+        @keyframes bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-7px) } }
+
+        .view { animation: fadeUp .5s var(--ease) both; }
+
+        /* ---------------- Buttons ---------------- */
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+            font-size: 1.02rem; font-weight: 700; letter-spacing: -.01em;
+            background: var(--accent); color: #fff; border-radius: 16px; padding: 15px 22px;
+            box-shadow: 0 10px 24px rgba(255, 90, 54, .32); transition: transform .12s var(--ease), box-shadow .2s, background .15s;
+        }
+        .btn:active { transform: scale(.96); background: var(--accent-press); }
+        .btn:disabled { opacity: .5; box-shadow: none; }
+        .btn.block { width: 100%; }
+        .btn.lg { padding: 17px 24px; font-size: 1.08rem; border-radius: 18px; }
+        .btn.ghost { background: var(--card); color: var(--ink); box-shadow: var(--shadow-sm); border: 1px solid var(--line); }
+        .btn.ghost:active { background: var(--bg-2); }
+        .btn.soft { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
+        .btn.soft:active { background: #ffe2d8; }
+        .iconbtn {
+            width: 44px; height: 44px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center;
+            background: var(--card); color: var(--ink-2); box-shadow: var(--shadow-sm); border: 1px solid var(--line); transition: transform .12s, background .15s; flex: 0 0 auto;
+        }
+        .iconbtn:active { transform: scale(.92); background: var(--bg-2); }
+
+        /* ---------------- Onboarding ---------------- */
+        .ob { flex: 1; display: flex; flex-direction: column; padding-top: calc(env(safe-area-inset-top) + 8px); }
+        .ob-top { display: flex; align-items: center; gap: 10px; padding: 14px 2px 4px; min-height: 56px; }
+        .ob-back { color: var(--muted); display: none; }
+        .ob-back.show { display: inline-flex; }
+        .progress-dots { display: flex; gap: 7px; margin-left: auto; margin-right: auto; }
+        .progress-dots i { width: 7px; height: 7px; border-radius: 4px; background: var(--line-2); transition: .3s var(--ease); }
+        .progress-dots i.on { width: 22px; background: var(--accent); }
+        .ob-body { flex: 1; display: flex; flex-direction: column; padding: 8px 2px 0; }
+        .hero-emoji { font-size: 4.6rem; line-height: 1; animation: bob 3.5s ease-in-out infinite; filter: drop-shadow(0 12px 22px rgba(255,90,54,.32)); }
+        .ob h1 { font-size: 2.05rem; font-weight: 800; letter-spacing: -.03em; margin: 18px 0 8px; line-height: 1.08; }
+        .ob p.sub { color: var(--ink-2); font-size: 1.05rem; line-height: 1.5; margin: 0 0 22px; max-width: 30ch; }
+        .ob-foot { padding: 14px 2px calc(env(safe-area-inset-bottom) + 8px); }
+
+        .field-label { font-size: .82rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 0 0 10px; }
+        .input {
+            width: 100%; background: var(--card); border: 1.5px solid var(--line-2); border-radius: 15px; padding: 15px 16px;
+            font-size: 1.05rem; color: var(--ink); outline: none; transition: border-color .15s, box-shadow .15s; box-shadow: var(--shadow-sm);
+        }
+        .input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+        .input::placeholder { color: var(--faint); }
+
+        .emoji-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+        .emoji-pick { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; font-size: 1.5rem; background: var(--card); border: 1.5px solid var(--line-2); transition: transform .12s var(--ease), border-color .15s; }
+        .emoji-pick:active { transform: scale(.9); }
+        .emoji-pick.on { border-color: var(--accent); background: var(--accent-soft); transform: scale(1.06); }
+
+        .chips { display: flex; flex-wrap: wrap; gap: 9px; }
+        .chip {
+            display: inline-flex; align-items: center; gap: 7px; padding: 11px 15px; border-radius: 13px; font-size: .98rem; font-weight: 600;
+            background: var(--card); color: var(--ink-2); border: 1.5px solid var(--line-2); transition: transform .12s var(--ease), border-color .15s, background .15s, color .15s;
+        }
+        .chip:active { transform: scale(.94); }
+        .chip.love { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+        .chip.avoid { background: var(--red-soft); color: var(--red); border-color: var(--red); text-decoration: line-through; }
+        .chip.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+        .chip .e { font-size: 1.1rem; }
+        .seg { display: flex; gap: 8px; }
+        .seg .opt { flex: 1; text-align: center; padding: 13px 6px; border-radius: 14px; font-weight: 700; font-size: 1rem; background: var(--card); border: 1.5px solid var(--line-2); color: var(--ink-2); transition: .15s var(--ease); }
+        .seg .opt.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+
+        .pick-card {
+            display: flex; gap: 14px; align-items: center; width: 100%; text-align: left;
+            background: var(--card); border: 1.5px solid var(--line-2); border-radius: 18px; padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-sm);
+            transition: transform .12s var(--ease), border-color .15s;
+        }
+        .pick-card:active { transform: scale(.98); }
+        .pick-card.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+        .pick-card .pc-ic { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; font-size: 1.5rem; background: var(--bg-2); flex: 0 0 auto; }
+        .pick-card .pc-t { font-weight: 700; font-size: 1.06rem; }
+        .pick-card .pc-d { color: var(--muted); font-size: .9rem; margin-top: 2px; line-height: 1.4; }
+        .pick-card .pc-check { margin-left: auto; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line-2); display: grid; place-items: center; color: #fff; flex: 0 0 auto; transition: .15s; }
+        .pick-card.on .pc-check { background: var(--accent); border-color: var(--accent); }
+        .pick-card:not(.on) .pc-check .ic { opacity: 0; }
+
+        /* ---------------- Top bar ---------------- */
+        .topbar { display: flex; align-items: center; gap: 12px; padding: calc(env(safe-area-inset-top) + 14px) 2px 12px; position: sticky; top: 0; z-index: 20; background: linear-gradient(var(--bg) 70%, transparent); }
+        .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; min-width: 0; }
+        .brand .logo { width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), var(--amber)); display: grid; place-items: center; font-size: 1.15rem; box-shadow: 0 6px 16px rgba(255,90,54,.35); flex: 0 0 auto; }
+        .brand .tt { font-weight: 800; font-size: 1.15rem; letter-spacing: -.02em; line-height: 1; }
+        .brand .ss { font-size: .74rem; color: var(--muted); margin-top: 2px; }
+
+        /* members row */
+        .members { display: flex; align-items: center; gap: 10px; padding: 4px 2px 14px; }
+        .ava-stack { display: flex; }
+        .ava { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-size: 1.15rem; background: var(--card); border: 2.5px solid var(--bg); box-shadow: var(--shadow-sm); margin-left: -10px; position: relative; }
+        .ava:first-child { margin-left: 0; }
+        .ava.me { background: linear-gradient(135deg, var(--accent-soft), #fff); }
+        .ava .dot { position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%; background: var(--green); border: 2px solid var(--bg); }
+        .ava .dot.off { background: var(--faint); }
+        .members .mcount { font-size: .9rem; color: var(--muted); font-weight: 600; }
+        .members .share-mini { margin-left: auto; }
+
+        /* status pill */
+        .statuspill { display: inline-flex; align-items: center; gap: 7px; font-size: .8rem; font-weight: 600; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; box-shadow: var(--shadow-sm); }
+        .statuspill .live { width: 7px; height: 7px; border-radius: 50%; background: var(--green); position: relative; }
+        .statuspill .live::after { content:''; position:absolute; inset:-3px; border-radius:50%; background: var(--green); animation: pulse 1.8s ease-out infinite; }
+        .statuspill.off .live { background: var(--faint); }
+        .statuspill.off .live::after { display: none; }
+
+        /* location bar */
+        .locbar { display: flex; align-items: center; gap: 8px; font-size: .88rem; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 11px 14px; box-shadow: var(--shadow-sm); margin-bottom: 14px; }
+        .locbar .ic { color: var(--accent); }
+        .locbar b { font-weight: 700; }
+        .locbar .chg { margin-left: auto; color: var(--accent); font-weight: 700; font-size: .85rem; }
+
+        /* primary find */
+        .find-wrap { margin-bottom: 18px; }
+        .find-hint { text-align: center; color: var(--muted); font-size: .86rem; margin-top: 9px; }
+
+        /* section title */
+        .sec-h { display: flex; align-items: baseline; gap: 8px; margin: 6px 2px 12px; }
+        .sec-h h2 { font-size: 1.18rem; font-weight: 800; letter-spacing: -.02em; margin: 0; }
+        .sec-h .n { font-size: .85rem; color: var(--muted); font-weight: 600; margin-left: auto; }
+
+        /* option cards */
+        #board { position: relative; }
+        .opt {
+            background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; margin-bottom: 14px; box-shadow: var(--shadow-sm);
+            transition: transform .45s var(--ease), box-shadow .25s, border-color .25s; animation: fadeUp .45s var(--ease) both; will-change: transform;
+        }
+        .opt.top { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow); }
+        .opt.won { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-soft), var(--shadow); }
+        .opt-head { display: flex; gap: 13px; align-items: flex-start; }
+        .opt-ic { width: 50px; height: 50px; border-radius: 15px; display: grid; place-items: center; font-size: 1.6rem; flex: 0 0 auto; background: linear-gradient(135deg, var(--bg-2), #fff); position: relative; }
+        .opt.top .rankbadge, .opt.won .rankbadge { position: absolute; top: -8px; left: -8px; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; font-size: .7rem; font-weight: 800; display: grid; place-items: center; box-shadow: var(--shadow-sm); }
+        .opt.won .rankbadge { background: var(--green); }
+        .opt-tt { font-weight: 800; font-size: 1.12rem; letter-spacing: -.01em; line-height: 1.18; }
+        .opt-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: .85rem; margin-top: 4px; }
+        .opt-meta a { color: var(--muted); text-decoration: none; }
+        .opt-meta .ic { width: 1em; height: 1em; vertical-align: -.12em; }
+        .opt-pitch { font-size: .92rem; color: var(--ink-2); line-height: 1.5; margin: 11px 0 0; }
+
+        /* reactions tally */
+        .tally { display: flex; align-items: center; gap: 8px; margin-top: 13px; flex-wrap: wrap; }
+        .tally .who { display: inline-flex; align-items: center; gap: 4px; background: var(--bg-2); border-radius: 999px; padding: 4px 9px 4px 5px; font-size: .82rem; font-weight: 600; color: var(--ink-2); }
+        .tally .who .fe { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: .95rem; background: var(--card); }
+        .tally .who.in { background: var(--green-soft); color: var(--green); }
+        .tally .who.ok { background: var(--yellow-soft); color: #b9791a; }
+        .tally .who.no { background: var(--red-soft); color: var(--red); }
+        .tally .who.pending { opacity: .65; }
+
+        /* consensus bar */
+        .consensus { margin-top: 13px; }
+        .cbar { height: 8px; border-radius: 6px; background: var(--line); overflow: hidden; }
+        .cbar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--green), #5fe0a0); border-radius: 6px; transition: width .5s var(--ease); }
+        .cbar.blocked > i { background: linear-gradient(90deg, var(--red), #ff8aa0); }
+        .clabel { font-size: .82rem; color: var(--muted); margin-top: 7px; font-weight: 600; }
+        .clabel b { color: var(--ink-2); }
+
+        /* my reaction buttons */
+        .react { display: flex; gap: 8px; margin-top: 14px; }
+        .react .rb {
+            flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 11px 4px; border-radius: 14px;
+            background: var(--bg-2); border: 1.5px solid transparent; font-weight: 700; font-size: .78rem; color: var(--ink-2);
+            transition: transform .12s var(--ease), background .15s, border-color .15s; position: relative;
+        }
+        .react .rb .e { font-size: 1.35rem; transition: transform .15s var(--ease); }
+        .react .rb:active { transform: scale(.93); }
+        .react .rb.sel.in { background: var(--green-soft); border-color: var(--green); color: var(--green); }
+        .react .rb.sel.ok { background: var(--yellow-soft); border-color: var(--yellow); color: #b9791a; }
+        .react .rb.sel.no { background: var(--red-soft); border-color: var(--red); color: var(--red); }
+        .react .rb.sel .e { transform: scale(1.18); }
+        .react .rb .ai { position: absolute; top: 4px; right: 6px; font-size: .62rem; opacity: .7; }
+        .won-foot { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 13px 14px; border-radius: 16px; background: var(--green-soft); color: var(--green); font-weight: 800; animation: pop .4s var(--ease); }
+        .won-foot .big { font-size: 1.5rem; }
+        .won-foot .go { margin-left: auto; background: var(--green); color: #fff; border-radius: 12px; padding: 9px 14px; font-weight: 700; font-size: .9rem; }
+
+        /* empty / skeleton */
+        .empty { text-align: center; color: var(--muted); padding: 30px 20px; line-height: 1.55; animation: fadeIn .4s; }
+        .empty .be { font-size: 2.6rem; display: block; margin-bottom: 10px; animation: bob 3.5s ease-in-out infinite; }
+        .skel { height: 132px; border-radius: var(--r); margin-bottom: 14px; background: linear-gradient(100deg, var(--card) 30%, var(--bg-2) 50%, var(--card) 70%); background-size: 200% 100%; animation: shimmer 1.3s linear infinite; border: 1px solid var(--line); }
+
+        /* ---------------- Sheets (bottom) ---------------- */
+        .scrim { position: fixed; inset: 0; z-index: 60; background: rgba(30, 16, 8, .42); backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity .3s; }
+        .scrim.show { opacity: 1; pointer-events: auto; }
+        .sheet {
+            position: fixed; left: 50%; transform: translateX(-50%) translateY(102%); bottom: 0; z-index: 61; width: 100%; max-width: var(--shell);
+            background: var(--card); border-radius: 26px 26px 0 0; box-shadow: var(--shadow-lg); padding: 10px 18px calc(env(safe-area-inset-bottom) + 20px);
+            max-height: 90dvh; overflow-y: auto; transition: transform .42s var(--ease);
+        }
+        .sheet.show { transform: translateX(-50%) translateY(0); animation: sheetUp .42s var(--ease); }
+        .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line-2); margin: 6px auto 14px; }
+        .sheet h3 { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; margin: 0 0 4px; }
+        .sheet .sub { color: var(--ink-2); font-size: .96rem; line-height: 1.5; margin: 0 0 18px; }
+        .row { display: flex; gap: 10px; }
+        .row > * { flex: 1; }
+        .toggle-row { display: flex; align-items: center; gap: 14px; padding: 15px 0; border-top: 1px solid var(--line); }
+        .toggle-row:first-of-type { border-top: none; }
+        .toggle-row .tx { flex: 1; }
+        .toggle-row .tx .tt { font-weight: 700; font-size: 1rem; }
+        .toggle-row .tx .td { color: var(--muted); font-size: .85rem; margin-top: 2px; line-height: 1.4; }
+        .switch { width: 52px; height: 31px; border-radius: 999px; background: var(--line-2); position: relative; transition: background .2s; flex: 0 0 auto; }
+        .switch.on { background: var(--green); }
+        .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 25px; height: 25px; border-radius: 50%; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,.2); transition: transform .22s var(--ease); }
+        .switch.on::after { transform: translateX(21px); }
+        .switch.dis { opacity: .45; }
+
+        /* share sheet */
+        .qrbox { display: grid; place-items: center; padding: 18px; background: #fff; border-radius: 18px; margin: 4px auto 16px; width: max-content; box-shadow: var(--shadow-sm); }
+        .qrbox img, .qrbox canvas { display: block; border-radius: 6px; }
+        .linkbox { display: flex; align-items: center; gap: 10px; background: var(--bg-2); border-radius: 14px; padding: 13px 15px; margin-bottom: 14px; }
+        .linkbox .lk { flex: 1; font-size: .9rem; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+
+        /* toast */
+        #toasts { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 22px); z-index: 90; display: flex; flex-direction: column; gap: 8px; align-items: center; width: max-content; max-width: 92vw; }
+        .toast { background: var(--ink); color: var(--bg); font-size: .9rem; font-weight: 600; padding: 12px 18px; border-radius: 14px; box-shadow: var(--shadow-lg); animation: fadeUp .3s var(--ease); }
+        .toast.good { background: var(--green); color: #fff; }
+        .toast.bad { background: var(--red); color: #fff; }
+
+        /* match celebration */
+        #celebrate { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,12,7,.5); backdrop-filter: blur(5px); }
+        #celebrate.show { display: flex; animation: fadeIn .3s; }
+        .cele-card { background: var(--card); border-radius: 28px; box-shadow: var(--shadow-lg); padding: 30px 26px; text-align: center; max-width: 360px; width: 100%; animation: pop .5s var(--ease); }
+        .cele-card .cc-e { font-size: 4rem; animation: bob 2s ease-in-out infinite; }
+        .cele-card h2 { font-size: 1.7rem; font-weight: 800; letter-spacing: -.02em; margin: 12px 0 4px; }
+        .cele-card .cc-name { font-size: 1.25rem; font-weight: 800; color: var(--accent); margin: 6px 0; }
+        .cele-card .cc-sub { color: var(--ink-2); font-size: .95rem; line-height: 1.5; margin: 6px 0 20px; }
+        #confetti { position: fixed; inset: 0; z-index: 79; pointer-events: none; display: none; }
+        #confetti.show { display: block; }
+
+        .footnote { text-align: center; color: var(--faint); font-size: .72rem; padding: 18px 0 4px; }
+        .footnote a { color: var(--faint); text-decoration: none; }
+        ::-webkit-scrollbar { width: 0; height: 0; }
+    </style>
+</head>
+
+<body>
+    <canvas id="confetti"></canvas>
+    <div id="shell"></div>
+
+    <!-- scrim + sheets injected/toggled by JS -->
+    <div class="scrim" id="scrim"></div>
+
+    <!-- Share sheet -->
+    <div class="sheet" id="sheet-share">
+        <div class="grab"></div>
+        <h3>Invite the table</h3>
+        <p class="sub">Send this link. Whoever opens it joins instantly — no app, no sign-up.</p>
+        <div class="qrbox" id="qrbox"></div>
+        <div class="linkbox"><span class="lk" id="share-link">…</span></div>
+        <div class="row">
+            <button class="btn block" id="share-native"><svg class="ic" viewBox="0 0 24 24"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 16V4"/><path d="m8 8 4-4 4 4"/></svg> Share</button>
+            <button class="btn ghost block" id="share-copy"><svg class="ic" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg> Copy</button>
+        </div>
+    </div>
+
+    <!-- Settings sheet -->
+    <div class="sheet" id="sheet-settings">
+        <div class="grab"></div>
+        <h3>Your settings</h3>
+        <p class="sub">Choose how you join the decision. Everything stays on your device.</p>
+        <div class="toggle-row">
+            <div class="tx"><div class="tt">Let AI represent me <span id="ai-badge" style="font-size:.7rem;color:var(--muted)"></span></div><div class="td" id="ai-desc">Your on-device AI reacts to options for you.</div></div>
+            <div class="switch" id="sw-ai"></div>
+        </div>
+        <div class="toggle-row">
+            <div class="tx"><div class="tt">Auto-respond to new options</div><div class="td">React automatically from your taste the moment an option is proposed.</div></div>
+            <div class="switch" id="sw-auto"></div>
+        </div>
+        <button class="btn ghost block" id="edit-taste" style="margin-top:18px"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Edit my taste</button>
+        <button class="btn soft block" id="leave-table" style="margin-top:10px">Start a fresh table</button>
+        <div class="footnote">MatchMeal · © 2026 woodyhoko</div>
+    </div>
+
+    <!-- Taste sheet (edit later) -->
+    <div class="sheet" id="sheet-taste">
+        <div class="grab"></div>
+        <h3>Your taste</h3>
+        <p class="sub">Tap once to love, twice to avoid. This is shared with your table so the search fits everyone.</p>
+        <div class="field-label">Cuisines</div>
+        <div class="chips" id="taste-cuisines" style="margin-bottom:18px"></div>
+        <div class="field-label">Dietary</div>
+        <div class="chips" id="taste-diet" style="margin-bottom:18px"></div>
+        <div class="field-label">Budget</div>
+        <div class="seg" id="taste-budget" style="margin-bottom:18px"></div>
+        <div class="field-label">How far?</div>
+        <div class="seg" id="taste-radius" style="margin-bottom:8px"></div>
+        <button class="btn block" id="taste-save" style="margin-top:18px">Save</button>
+    </div>
+
+    <!-- Location sheet -->
+    <div class="sheet" id="sheet-loc">
+        <div class="grab"></div>
+        <h3>Where are you?</h3>
+        <p class="sub">We use this to find real places nearby. It never leaves your device.</p>
+        <button class="btn block" id="loc-gps" style="margin-bottom:14px"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> Use my current location</button>
+        <div class="field-label">Or type a place</div>
+        <div class="row" style="margin-bottom:8px">
+            <input class="input" id="loc-q" placeholder="e.g. Shibuya, Tokyo" style="flex:3" />
+            <button class="btn ghost" id="loc-find" style="flex:1">Find</button>
+        </div>
+        <div id="loc-result" style="margin-top:8px"></div>
+    </div>
+
+    <div id="toasts"></div>
+
+    <!-- Match celebration -->
+    <div id="celebrate">
+        <div class="cele-card">
+            <div class="cc-e">🎉</div>
+            <h2>It's a match!</h2>
+            <div class="cc-name" id="cele-name">—</div>
+            <div class="cc-sub" id="cele-sub">Everyone's in. Time to eat!</div>
+            <button class="btn block lg" id="cele-go"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> Open in maps</button>
+            <button class="btn ghost block" id="cele-close" style="margin-top:10px">Keep looking</button>
+        </div>
+    </div>
+
+    <script>
+        'use strict';
+        /* ============================ helpers ============================ */
+        const $ = id => document.getElementById(id);
+        const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+        const uid = (n = 6) => Array.from({ length: n }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+        const rid = () => Math.random().toString(36).slice(2, 10);
+        const now = () => Date.now();
+        const esc = s => (s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+        function haptic(ms = 12) { try { navigator.vibrate && navigator.vibrate(ms); } catch (_) {} }
+        function toast(msg, kind = '') {
+            const t = el('div', 'toast ' + kind, esc(msg));
+            $('toasts').appendChild(t);
+            setTimeout(() => { t.style.transition = 'opacity .3s, transform .3s'; t.style.opacity = '0'; t.style.transform = 'translateY(8px)'; setTimeout(() => t.remove(), 320); }, 2600);
+        }
+
+        const CUISINES = ['🍜 ramen', '🍕 pizza', '🍣 sushi', '🍔 burgers', '🌮 mexican', '🍝 italian', '🥘 thai', '🍛 indian', '🥟 chinese', '🍲 korean', '🥗 salads', '🍢 izakaya', '🍤 seafood', '🥩 bbq', '🧆 mediterranean', '🍩 cafe', '🌱 vegan', '🥐 french'];
+        const DIET = ['🥕 vegetarian', '🌱 vegan', '☪️ halal', '✡️ kosher', '🌾 gluten-free', '🥜 nut-free', '🐟 pescatarian', '🚫🥩 no beef', '🚫🐖 no pork'];
+        const BUDGETS = [['$', 'cheap'], ['$$', 'mid'], ['$$$', 'pricey'], ['$$$$', 'fancy']];
+        const RADII = [['👟', '1 km', 1000], ['🚲', '2.5 km', 2500], ['🚗', '6 km', 6000], ['🌍', '15 km', 15000]];
+        const AVATARS = ['😀', '😎', '🦊', '🐼', '🐨', '🐯', '🦁', '🐸', '🐵', '🦄', '🐙', '🦖', '🍔', '🍙', '🌮', '🥑', '🍓', '🌶️', '🧋', '🍑'];
+
+        /* ============================ state ============================ */
+        const S = {
+            me: { id: null, name: '', emoji: '😀', loves: [], avoids: [], diet: [], budget: '$$', radius: 2500 },
+            settings: { ai: false, autoRespond: true },
+            loc: null,                 // {lat, lon, label}
+            onboarded: false,
+            tableHost: null,           // host id we joined (null if I'm host)
+            // runtime
+            members: new Map(),        // id -> {id,name,emoji,prefs,online}
+            options: [],               // {id,name,cuisine,lat,lon,dist,address,by,byName,reactions:{id:'in'|'ok'|'no'},won}
+            seen: new Set(), seenOrder: [],
+            load() {
+                try {
+                    const p = JSON.parse(localStorage.getItem('mm2_me') || 'null'); if (p) this.me = { ...this.me, ...p };
+                    const s = JSON.parse(localStorage.getItem('mm2_set') || 'null'); if (s) this.settings = { ...this.settings, ...s };
+                    const l = JSON.parse(localStorage.getItem('mm2_loc') || 'null'); if (l) this.loc = l;
+                    this.onboarded = localStorage.getItem('mm2_onb') === '1';
+                } catch (_) {}
+                if (!this.me.name) this.me.name = '';
+            },
+            save() {
+                localStorage.setItem('mm2_me', JSON.stringify(this.me));
+                localStorage.setItem('mm2_set', JSON.stringify(this.settings));
+                if (this.loc) localStorage.setItem('mm2_loc', JSON.stringify(this.loc));
+                localStorage.setItem('mm2_onb', this.onboarded ? '1' : '0');
+            },
+            myPrefs() { const m = this.me; return { name: m.name, emoji: m.emoji, loves: m.loves, avoids: m.avoids, diet: m.diet, budget: m.budget, radius: m.radius }; }
+        };
+
+        // member list (self + online peers) used for ranking & consensus
+        function liveMembers() {
+            const arr = [{ id: S.me.id, name: S.me.name, emoji: S.me.emoji, prefs: S.myPrefs(), online: true, me: true }];
+            for (const m of S.members.values()) if (m.online) arr.push(m);
+            return arr;
+        }
+        function memberInfo(id) {
+            if (id === S.me.id) return { name: S.me.name, emoji: S.me.emoji };
+            const m = S.members.get(id); return m ? { name: m.name, emoji: m.emoji } : { name: '?', emoji: '🙂' };
+        }
+
+        /* ============================ AI (Chrome built-in, optional) ============================ */
+        const AI = {
+            available: false, session: null,
+            async detect() {
+                try {
+                    if (typeof window.LanguageModel !== 'undefined') {
+                        // Never let a slow/hung availability() block the app — race a timeout.
+                        const a = await Promise.race([
+                            window.LanguageModel.availability(),
+                            new Promise(r => setTimeout(() => r('unavailable'), 1500))
+                        ]);
+                        this.available = !!a && a !== 'unavailable';
+                    }
+                } catch (_) { this.available = false; }
+                return this.available;
+            },
+            async react(option) {
+                // returns {r, reason}
+                const schema = { type: 'object', properties: { r: { type: 'string', enum: ['in', 'ok', 'no'] }, reason: { type: 'string' } }, required: ['r'] };
+                const p = S.me;
+                const prompt = `You react on behalf of a diner to a restaurant suggestion. Reply ONLY as JSON.
+Diner loves: ${p.loves.join(', ') || 'anything'}. Avoids: ${p.avoids.join(', ') || 'nothing'}. Diet: ${p.diet.join(', ') || 'none'}. Budget up to ${p.budget}.
+Suggestion: "${option.name}" (${option.cuisine || 'unknown'}), ${option.dist}m away.
+Pick "in" (happy to go), "ok" (fine, minor worry), or "no" (won't go). One short reason.
+JSON: {"r":"in|ok|no","reason":"..."}`;
+                try {
+                    const s = await window.LanguageModel.create();
+                    let raw;
+                    try { raw = await s.prompt(prompt, { responseConstraint: schema }); } finally { s.destroy(); }
+                    const o = JSON.parse(extractJson(raw));
+                    if (['in', 'ok', 'no'].includes(o.r)) return { r: o.r, reason: (o.reason || '').trim() };
+                } catch (e) { console.warn('AI react failed', e); }
+                return null;
+            }
+        };
+        function extractJson(t) {
+            if (!t) return '{}';
+            const s = t.indexOf('{'); if (s < 0) return t;
+            let d = 0, q = false, e = false;
+            for (let i = s; i < t.length; i++) { const c = t[i]; if (q) { if (e) e = false; else if (c === '\\') e = true; else if (c === '"') q = false; } else if (c === '"') q = true; else if (c === '{') d++; else if (c === '}') { if (--d === 0) return t.slice(s, i + 1); } }
+            return t.slice(s);
+        }
+
+        // Deterministic reaction from preferences (no AI needed) — this is how
+        // a no-AI / low-end user still contributes a verdict from their taste.
+        function smartReact(option) {
+            const cu = (option.cuisine || '').toLowerCase(), nm = (option.name || '').toLowerCase();
+            const loves = S.me.loves.map(bareWord), avoids = S.me.avoids.map(bareWord);
+            if (avoids.some(a => a && (cu.includes(a) || nm.includes(a)))) return { r: 'no', reason: `not keen on ${avoids.find(a => cu.includes(a) || nm.includes(a))}` };
+            if (option.dist > S.me.radius * 1.35) return { r: 'ok', reason: `a bit far (${option.dist}m)` };
+            if (loves.some(l => l && (cu.includes(l) || nm.includes(l)))) return { r: 'in', reason: `love ${loves.find(l => cu.includes(l) || nm.includes(l))}` };
+            return { r: 'in', reason: 'works for me' };
+        }
+        const bareWord = s => (s || '').replace(/^[^\p{L}]+/u, '').toLowerCase().trim(); // strip leading emoji
+
+        /* ============================ search (OpenStreetMap) ============================ */
+        function haversine(a, b, c, d) { const R = 6371000, r = x => x * Math.PI / 180; const dla = r(c - a), dlo = r(d - b); const h = Math.sin(dla / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(dlo / 2) ** 2; return Math.round(R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h))); }
+        const OVERPASS = ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+        async function fetchNearby(lat, lon, radius) {
+            const q = `[out:json][timeout:25];(node["amenity"~"^(restaurant|cafe|fast_food)$"](around:${radius},${lat},${lon}););out body 80;`;
+            for (const ep of OVERPASS) {
+                try {
+                    const r = await fetch(ep, { method: 'POST', body: 'data=' + encodeURIComponent(q), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+                    if (!r.ok) continue;
+                    const j = await r.json();
+                    return (j.elements || []).filter(e => e.tags && e.tags.name).map(e => ({
+                        name: e.tags.name, cuisine: (e.tags.cuisine || '').replace(/[_;]/g, ' ').replace(/\s+/g, ' ').trim(),
+                        kind: e.tags.amenity, lat: e.lat, lon: e.lon, dist: haversine(lat, lon, e.lat, e.lon),
+                        address: [e.tags['addr:housenumber'], e.tags['addr:street']].filter(Boolean).join(' '),
+                        veg: e.tags['diet:vegetarian'] === 'yes', vegan: e.tags['diet:vegan'] === 'yes'
+                    })).sort((a, b) => a.dist - b.dist);
+                } catch (_) {}
+            }
+            throw new Error('Could not reach the restaurant search.');
+        }
+        async function geocode(qy) { const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(qy)}`, { headers: { Accept: 'application/json' } }); const j = await r.json(); if (!j.length) throw new Error('Not found'); return { lat: +j[0].lat, lon: +j[0].lon, label: j[0].display_name.split(',').slice(0, 2).join(', ') }; }
+        async function reverse(lat, lon) { try { const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&zoom=14&lat=${lat}&lon=${lon}`, { headers: { Accept: 'application/json' } }); const a = (await r.json()).address || {}; return a.suburb || a.neighbourhood || a.city || a.town || a.village || `${lat.toFixed(2)}, ${lon.toFixed(2)}`; } catch (_) { return `${lat.toFixed(2)}, ${lon.toFixed(2)}`; } }
+        function gps() { return new Promise((res, rej) => { if (!navigator.geolocation) return rej(new Error('no geolocation')); navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lon: p.coords.longitude }), rej, { timeout: 10000, maximumAge: 600000 }); }); }
+
+        /* ============================ mesh (PeerJS) ============================ */
+        const Mesh = {
+            peer: null, conns: new Map(), online: false,
+            seenAdd(id) { S.seen.add(id); S.seenOrder.push(id); if (S.seenOrder.length > 800) S.seen.delete(S.seenOrder.shift()); },
+            start() {
+                const myId = 'tbl-' + uid(6);
+                return new Promise(res => {
+                    this.peer = new Peer(myId, { debug: 1 });
+                    this.peer.on('open', id => { S.me.id = id; this.online = true; res(id); });
+                    this.peer.on('connection', c => this.wire(c, true));
+                    this.peer.on('error', e => {
+                        console.warn('peer err', e.type);
+                        if (e.type === 'unavailable-id') { this.peer.destroy(); this.start().then(res); }
+                        else if (e.type === 'peer-unavailable') toast('That table is offline or the link is old.', 'bad');
+                        else if (!S.me.id) { S.me.id = myId; res(myId); toast('Signalling unreachable — running solo.', 'bad'); }
+                    });
+                    this.peer.on('disconnected', () => { if (!S.tableHost) { try { this.peer.reconnect(); } catch (_) {} } });
+                });
+            },
+            connect(id) { id = (id || '').trim(); if (!id || id === S.me.id || this.conns.has(id)) return; this.wire(this.peer.connect(id, { reliable: true }), false); },
+            wire(conn, incoming) {
+                conn.on('open', () => {
+                    this.conns.set(conn.peer, conn);
+                    if (!S.members.has(conn.peer)) S.members.set(conn.peer, { id: conn.peer, name: conn.peer, emoji: '🙂', prefs: null, online: true });
+                    else S.members.get(conn.peer).online = true;
+                    // introduce + share my prefs + gossip peers
+                    this.send(conn, env('HELLO', { name: S.me.name, emoji: S.me.emoji, prefs: S.myPrefs(), peers: [...this.conns.keys()].filter(p => p !== conn.peer) }));
+                    // The side that was DIALED hands the newcomer the full table state.
+                    if (incoming) this.send(conn, env('SYNC', { options: S.options.map(serOpt), members: liveMembers().filter(m => !m.me).map(m => ({ id: m.id, name: m.name, emoji: m.emoji, prefs: m.prefs })) }));
+                    renderApp();
+                });
+                conn.on('data', d => this.onMsg(conn, d));
+                conn.on('close', () => { this.conns.delete(conn.peer); const m = S.members.get(conn.peer); if (m) m.online = false; renderApp(); });
+                conn.on('error', e => console.warn('conn err', e));
+            },
+            send(conn, e) { try { conn.send(e); } catch (_) {} },
+            bcast(e, except) { for (const [pid, c] of this.conns) if (pid !== except) this.send(c, e); },
+            emit(type, payload) { const e = env(type, payload); this.seenAdd(e.id); this.bcast(e); return e; },
+            onMsg(conn, e) {
+                if (!e || !e.id) return;
+                if (e.type === 'HELLO') {
+                    const m = S.members.get(conn.peer) || { id: conn.peer };
+                    m.name = e.payload.name || conn.peer; m.emoji = e.payload.emoji || '🙂'; m.prefs = e.payload.prefs || m.prefs; m.online = true;
+                    S.members.set(conn.peer, m);
+                    (e.payload.peers || []).forEach(p => { if (p !== S.me.id && !this.conns.has(p)) this.connect(p); });
+                    renderApp(); return;
+                }
+                if (S.seen.has(e.id)) return; this.seenAdd(e.id);
+                handle(e);
+                if (e.type !== 'SYNC' && e.ttl > 1) this.bcast({ ...e, ttl: e.ttl - 1 }, conn.peer);
+            }
+        };
+        function env(type, payload, ttl = 5) { return { id: rid(), type, from: S.me.id, fromName: S.me.name, fromEmoji: S.me.emoji, ttl, ts: now(), payload }; }
+        function serOpt(o) { return { id: o.id, name: o.name, cuisine: o.cuisine, lat: o.lat, lon: o.lon, dist: o.dist, address: o.address, by: o.by, byName: o.byName, pitch: o.pitch, reactions: o.reactions, won: o.won }; }
+        function findOpt(id) { return S.options.find(o => o.id === id); }
+
+        function handle(e) {
+            const p = e.payload || {};
+            if (e.type === 'SYNC') {
+                (p.members || []).forEach(m => { if (m.id !== S.me.id && !S.members.has(m.id)) S.members.set(m.id, { ...m, online: true }); else if (S.members.get(m.id)) { const x = S.members.get(m.id); x.prefs = x.prefs || m.prefs; } });
+                (p.options || []).forEach(o => { if (!findOpt(o.id)) S.options.push({ ...o, reactions: o.reactions || {} }); });
+                renderApp(); autoRespondAll(); return;
+            }
+            if (e.type === 'PROPOSE') {
+                (p.options || []).forEach(o => { if (!findOpt(o.id)) S.options.push({ ...o, reactions: o.reactions || {} }); });
+                renderApp(); autoRespondAll(); return;
+            }
+            if (e.type === 'REACT') {
+                const o = findOpt(p.optionId); if (!o) return;
+                o.reactions[e.from] = p.r; renderApp(); return;
+            }
+            if (e.type === 'FINALIZE') {
+                const o = findOpt(p.optionId); if (!o || o.won) return;
+                o.won = true; S.options.forEach(x => { if (x.id !== o.id) x.won = false; }); renderApp(); showCelebration(o); return;
+            }
+        }
+
+        /* ============================ decision logic ============================ */
+        // Aggregate the WHOLE table's preferences so whoever searches considers everyone.
+        function aggregatePrefs() {
+            const mems = liveMembers().map(m => m.prefs).filter(Boolean);
+            const loves = {}, avoids = new Set(), diet = new Set(); let radius = 99999; const budgets = [];
+            mems.forEach(p => {
+                (p.loves || []).forEach(c => { const w = bareWord(c); if (w) loves[w] = (loves[w] || 0) + 1; });
+                (p.avoids || []).forEach(c => { const w = bareWord(c); if (w) avoids.add(w); });
+                (p.diet || []).forEach(d => diet.add(bareWord(d)));
+                if (p.radius) radius = Math.min(radius, p.radius);
+                if (p.budget) budgets.push(p.budget.length);
+            });
+            if (radius === 99999) radius = S.me.radius;
+            const topLoves = Object.entries(loves).sort((a, b) => b[1] - a[1]).map(x => x[0]);
+            return { loves: topLoves, avoids, diet, radius, budget: budgets.length ? Math.min(...budgets) : 2 };
+        }
+        function scoreCandidate(c, agg) {
+            const cu = (c.cuisine || '').toLowerCase(), nm = c.name.toLowerCase();
+            let s = 0;
+            agg.loves.forEach((l, i) => { if (l && (cu.includes(l) || nm.includes(l))) s += Math.max(5 - i, 1) + 3; });
+            if ([...agg.avoids].some(a => a && (cu.includes(a) || nm.includes(a)))) s -= 100;
+            if (agg.diet.has('vegan') && c.vegan) s += 3;
+            if (agg.diet.has('vegetarian') && (c.veg || c.vegan)) s += 2;
+            s -= c.dist / 600;
+            return s;
+        }
+
+        let searching = false;
+        async function findPlaces() {
+            if (searching) return;
+            if (!S.loc) { openSheet('sheet-loc'); return; }
+            searching = true; renderApp();
+            try {
+                const agg = aggregatePrefs();
+                const cands = await fetchNearby(S.loc.lat, S.loc.lon, Math.max(agg.radius, 1200));
+                const have = new Set(S.options.map(o => o.name.toLowerCase()));
+                const ranked = cands
+                    .filter(c => !have.has(c.name.toLowerCase()))
+                    .map(c => ({ c, s: scoreCandidate(c, agg) }))
+                    .filter(x => x.s > -50)
+                    .sort((a, b) => b.s - a.s)
+                    .slice(0, 6)
+                    .map(x => x.c);
+                if (!ranked.length) { toast('No new spots matched — try a wider distance.', 'bad'); return; }
+                const batch = ranked.map(c => ({
+                    id: rid(), name: c.name, cuisine: c.cuisine || prettyKind(c.kind), lat: c.lat, lon: c.lon, dist: c.dist,
+                    address: c.address, by: S.me.id, byName: S.me.name, pitch: pitchFor(c, agg), reactions: {}, won: false
+                }));
+                S.options.push(...batch);
+                Mesh.emit('PROPOSE', { options: batch.map(serOpt) });
+                renderApp();
+                autoRespondAll();
+                haptic(18);
+            } catch (e) { console.error(e); toast(e.message || 'Search failed', 'bad'); }
+            finally { searching = false; renderApp(); }
+        }
+        const prettyKind = k => k === 'cafe' ? 'café' : k === 'fast_food' ? 'fast food' : 'restaurant';
+        function pitchFor(c, agg) {
+            const cu = (c.cuisine || '').toLowerCase();
+            const hit = agg.loves.find(l => l && cu.includes(l));
+            if (hit) return `${cap(hit)} the table loves, ${c.dist}m away.`;
+            return `${c.dist}m away${c.cuisine ? ' · ' + c.cuisine : ''}.`;
+        }
+        const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+
+        // React to options that I haven't reacted to yet (auto mode).
+        let autoBusy = false;
+        async function autoRespondAll() {
+            if (!S.settings.autoRespond || autoBusy) return;
+            autoBusy = true;
+            try {
+                for (const o of S.options) {
+                    if (o.won || o.reactions[S.me.id]) continue;
+                    let v = null;
+                    if (S.settings.ai && AI.available) v = await AI.react(o);
+                    if (!v) v = smartReact(o);
+                    setMyReaction(o, v.r, false);
+                }
+            } finally { autoBusy = false; }
+        }
+
+        function setMyReaction(o, r, human) {
+            o.reactions[S.me.id] = r;
+            Mesh.emit('REACT', { optionId: o.id, r });
+            renderApp();
+            if (human) haptic();
+        }
+        // Finalising is a deliberate, all-party act: the "Lock it in" button only
+        // appears once EVERY live member is in, and any member may then seal it.
+        function finalizeOption(o) {
+            if (o.won) return;
+            const c = consensusState(o);
+            if (!c.all) { toast('Everyone needs to be in first.', 'bad'); return; }
+            o.won = true; S.options.forEach(x => { if (x.id !== o.id) x.won = false; });
+            Mesh.emit('FINALIZE', { optionId: o.id });
+            renderApp(); showCelebration(o);
+        }
+
+        // Consensus = every LIVE member is "in". Decided by all parties.
+        function consensusState(o) {
+            const mems = liveMembers();
+            const ins = mems.filter(m => o.reactions[m.id] === 'in').length;
+            const nos = mems.filter(m => o.reactions[m.id] === 'no').length;
+            const reacted = mems.filter(m => o.reactions[m.id]).length;
+            return { total: mems.length, ins, nos, reacted, all: mems.length >= 1 && ins === mems.length };
+        }
+        function optScore(o) {
+            const mems = liveMembers();
+            let s = 0; mems.forEach(m => { const r = o.reactions[m.id]; if (r === 'in') s += 2; else if (r === 'ok') s += 1; else if (r === 'no') s -= 3; });
+            return s;
+        }
+        function rankedOptions() {
+            return [...S.options].map((o, i) => ({ o, i })).sort((a, b) => {
+                if (a.o.won !== b.o.won) return a.o.won ? -1 : 1;
+                const ds = optScore(b.o) - optScore(a.o); if (ds) return ds;
+                return a.o.dist - b.o.dist;
+            }).map(x => x.o);
+        }
+
+        /* ============================ rendering ============================ */
+        let CUR = 'app';
+        function render() { S.onboarded && S.me.id ? renderApp() : renderOnboard(); }
+
+        // ---- onboarding ----
+        let obStep = 0;
+        const OB_STEPS = 4;
+        function renderOnboard() {
+            CUR = 'ob';
+            const joining = !!new URLSearchParams(location.search).get('t');
+            const shell = $('shell');
+            shell.innerHTML = '';
+            const wrap = el('div', 'ob view');
+            // top
+            const top = el('div', 'ob-top');
+            top.innerHTML = `<button class="iconbtn ob-back ${obStep > 0 ? 'show' : ''}" id="ob-back"><svg class="ic" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+                <div class="progress-dots">${Array.from({ length: OB_STEPS }, (_, i) => `<i class="${i <= obStep ? 'on' : ''}"></i>`).join('')}</div>
+                <div style="width:44px"></div>`;
+            wrap.appendChild(top);
+            const body = el('div', 'ob-body');
+            const foot = el('div', 'ob-foot');
+            wrap.appendChild(body); wrap.appendChild(foot);
+            shell.appendChild(wrap);
+
+            if (obStep === 0) {
+                body.innerHTML = `<div style="margin:auto 0;text-align:center;width:100%">
+                    <div class="hero-emoji">🍽️</div>
+                    <h1 style="margin-top:22px">Where to<br>eat, together.</h1>
+                    <p class="sub" style="margin:14px auto 0">Share one link. Everyone adds their taste. MatchMeal finds the spot the whole table loves — in seconds.</p>
+                </div>`;
+                foot.innerHTML = `<button class="btn block lg" id="ob-next">${joining ? "Join the table" : "Let's go"}</button>
+                    <div style="text-align:center;color:var(--muted);font-size:.8rem;margin-top:12px">No sign-up · works on any phone</div>`;
+            }
+            if (obStep === 1) {
+                body.innerHTML = `<h1>Hi! Who are you?</h1><p class="sub">Just a name your friends will recognise.</p>
+                    <div class="field-label">Your name</div>
+                    <input class="input" id="ob-name" maxlength="20" placeholder="e.g. Mia" value="${esc(S.me.name)}" />
+                    <div class="field-label" style="margin-top:20px">Pick an avatar</div>
+                    <div class="emoji-row" id="ob-emojis">${AVATARS.map(a => `<button class="emoji-pick ${a === S.me.emoji ? 'on' : ''}" data-e="${a}">${a}</button>`).join('')}</div>`;
+                foot.innerHTML = `<button class="btn block lg" id="ob-next">Continue</button>`;
+                setTimeout(() => { const n = $('ob-name'); n && n.focus(); }, 350);
+            }
+            if (obStep === 2) {
+                body.innerHTML = `<h1>What do you love?</h1><p class="sub">Tap to <b style="color:var(--accent)">love</b>, tap again to <b style="color:var(--red)">avoid</b>. Pick a few — you can change anytime.</p>
+                    <div class="chips" id="ob-cuisines">${CUISINES.map(c => chipHtml(c)).join('')}</div>
+                    <div class="field-label" style="margin-top:22px">Any dietary needs?</div>
+                    <div class="chips" id="ob-diet">${DIET.map(d => `<button class="chip ${S.me.diet.includes(d) ? 'on' : ''}" data-d="${esc(d)}"><span class="e">${d.split(' ')[0]}</span> ${d.split(' ').slice(1).join(' ')}</button>`).join('')}</div>`;
+                foot.innerHTML = `<button class="btn block lg" id="ob-next">Continue</button>`;
+            }
+            if (obStep === 3) {
+                const aiOK = AI.available;
+                body.innerHTML = `<h1>How do you<br>want to play?</h1><p class="sub">${aiOK ? 'Your device can run AI on-device — let it react for you, or do it yourself.' : 'Pick how you respond to suggestions. You can switch later.'}</p>
+                    <button class="pick-card ${S.settings.autoRespond ? 'on' : ''}" data-mode="auto">
+                        <div class="pc-ic">⚡</div>
+                        <div style="flex:1"><div class="pc-t">Auto from my taste</div><div class="pc-d">Instantly react to options using my preferences. ${aiOK ? 'Uses on-device AI when helpful.' : 'No AI needed — fast on any phone.'}</div></div>
+                        <div class="pc-check"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div>
+                    </button>
+                    <button class="pick-card ${!S.settings.autoRespond ? 'on' : ''}" data-mode="manual">
+                        <div class="pc-ic">👆</div>
+                        <div style="flex:1"><div class="pc-t">I'll tap myself</div><div class="pc-d">Review each suggestion and react when you want to.</div></div>
+                        <div class="pc-check"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div>
+                    </button>
+                    ${aiOK ? `<div class="toggle-row" style="margin-top:8px"><div class="tx"><div class="tt">Use on-device AI 🧠</div><div class="td">Smarter, nuanced reactions. Stays on your device.</div></div><div class="switch ${S.settings.ai ? 'on' : ''}" id="ob-ai"></div></div>` : ''}`;
+                foot.innerHTML = `<button class="btn block lg" id="ob-next">${joining ? 'Join the table' : 'Create my table'}</button>`;
+            }
+            wireOnboard(joining);
+        }
+        function chipHtml(c) {
+            const state = S.me.loves.includes(c) ? 'love' : S.me.avoids.includes(c) ? 'avoid' : '';
+            return `<button class="chip ${state}" data-c="${esc(c)}"><span class="e">${c.split(' ')[0]}</span> ${c.split(' ').slice(1).join(' ')}</button>`;
+        }
+        function wireOnboard(joining) {
+            const back = $('ob-back'); if (back) back.onclick = () => { if (obStep > 0) { obStep--; renderOnboard(); } };
+            const next = $('ob-next'); if (next) next.onclick = () => obNext(joining);
+            if (obStep === 1) {
+                $('ob-name').oninput = e => S.me.name = e.target.value;
+                $('ob-emojis').onclick = e => { const b = e.target.closest('[data-e]'); if (!b) return; S.me.emoji = b.dataset.e; $('ob-emojis').querySelectorAll('.emoji-pick').forEach(x => x.classList.toggle('on', x === b)); haptic(); };
+            }
+            if (obStep === 2) {
+                $('ob-cuisines').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; cycleCuisine(b.dataset.c); $('ob-cuisines').innerHTML = CUISINES.map(c => chipHtml(c)).join(''); haptic(); };
+                $('ob-diet').onclick = e => { const b = e.target.closest('[data-d]'); if (!b) return; const d = b.dataset.d; S.me.diet.includes(d) ? S.me.diet = S.me.diet.filter(x => x !== d) : S.me.diet.push(d); b.classList.toggle('on'); haptic(); };
+            }
+            if (obStep === 3) {
+                document.querySelectorAll('[data-mode]').forEach(c => c.onclick = () => { S.settings.autoRespond = c.dataset.mode === 'auto'; document.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('on', x === c)); haptic(); });
+                const ai = $('ob-ai'); if (ai) ai.onclick = () => { S.settings.ai = !S.settings.ai; ai.classList.toggle('on', S.settings.ai); haptic(); };
+            }
+        }
+        function cycleCuisine(c) {
+            if (S.me.loves.includes(c)) { S.me.loves = S.me.loves.filter(x => x !== c); S.me.avoids.push(c); }
+            else if (S.me.avoids.includes(c)) { S.me.avoids = S.me.avoids.filter(x => x !== c); }
+            else { S.me.loves.push(c); }
+        }
+        async function obNext(joining) {
+            if (obStep === 1 && !S.me.name.trim()) { S.me.name = 'Guest ' + uid(2); }
+            if (obStep < OB_STEPS - 1) { obStep++; S.save(); renderOnboard(); return; }
+            // finish
+            S.onboarded = true; S.save();
+            await boot();
+        }
+
+        // ---- main app ----
+        function renderApp() {
+            if (CUR !== 'app') CUR = 'app';
+            const shell = $('shell');
+            // build once, then patch board for FLIP smoothness
+            if (!$('app-root')) {
+                shell.innerHTML = '';
+                const root = el('div', 'view'); root.id = 'app-root';
+                root.innerHTML = `
+                    <div class="topbar">
+                        <div class="brand"><div class="logo">🍽️</div><div><div class="tt">MatchMeal</div><div class="ss" id="table-sub">your table</div></div></div>
+                        <div class="statuspill" id="statpill"><span class="live"></span><span id="stat-label">online</span></div>
+                        <button class="iconbtn" id="open-settings"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
+                    </div>
+                    <div class="members" id="members"></div>
+                    <div class="locbar" id="locbar"></div>
+                    <div class="find-wrap"><button class="btn block lg" id="find-btn"></button><div class="find-hint" id="find-hint"></div></div>
+                    <div class="sec-h"><h2>On the table</h2><span class="n" id="board-n"></span></div>
+                    <div id="board"></div>
+                    <div class="footnote"><a href="index.html">classic version</a> · © 2026 woodyhoko</div>`;
+                shell.appendChild(root);
+                $('open-settings').onclick = () => { syncSettingsSheet(); openSheet('sheet-settings'); };
+                $('find-btn').onclick = findPlaces;
+                $('locbar').onclick = () => openSheet('sheet-loc');
+            }
+            // status
+            const np = Mesh.conns.size;
+            $('stat-label').textContent = Mesh.online ? (np ? `${np + 1} here` : 'online') : 'offline';
+            $('statpill').className = 'statuspill' + (Mesh.online ? '' : ' off');
+            $('table-sub').textContent = S.tableHost ? 'joined a table' : (np ? 'you host' : 'tap share to invite');
+            // members + share
+            renderMembers();
+            // location
+            $('locbar').innerHTML = S.loc
+                ? `<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> <b>${esc(S.loc.label)}</b> <span class="chg">change</span>`
+                : `<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> <span style="color:var(--muted)">Set your location to search</span> <span class="chg">set</span>`;
+            // find button
+            $('find-btn').disabled = searching;
+            $('find-btn').innerHTML = searching
+                ? `<svg class="ic" viewBox="0 0 24 24" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.2-8.5"/></svg> Finding great spots…`
+                : `<svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg> ${S.options.length ? 'Find more places' : 'Find places nearby'}`;
+            $('find-hint').textContent = S.options.length ? '' : (np ? "considers everyone's taste at the table" : 'invite friends, then find a place together');
+            // board
+            renderBoard();
+        }
+
+        function renderMembers() {
+            const m = $('members'); const mem = liveMembers();
+            const stack = mem.slice(0, 6).map(x => `<div class="ava ${x.me ? 'me' : ''}" title="${esc(x.name)}">${esc(x.emoji)}<span class="dot ${x.online ? '' : 'off'}"></span></div>`).join('');
+            m.innerHTML = `<div class="ava-stack">${stack}</div><span class="mcount">${mem.length === 1 ? 'just you' : mem.length + ' at the table'}</span>
+                <button class="btn soft share-mini" id="share-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5 8.6 10.5"/></svg> Invite</button>`;
+            $('share-btn').onclick = openShare;
+        }
+
+        // FLIP-animated board so re-ranking glides instead of jumping.
+        function renderBoard() {
+            const board = $('board'); const n = $('board-n');
+            const ranked = rankedOptions();
+            n.textContent = ranked.length ? `${ranked.length}` : '';
+            if (searching && !ranked.length) { board.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>'; return; }
+            if (!ranked.length) {
+                board.innerHTML = `<div class="empty"><span class="be">🍜</span>${Mesh.conns.size ? 'Nothing on the table yet.<br>Hit <b>Find places</b> to load spots everyone can react to.' : 'Invite a friend, set your spot,<br>then find places together.'}</div>`;
+                return;
+            }
+            // FLIP: record old positions
+            const first = {};
+            board.querySelectorAll('.opt').forEach(c => first[c.dataset.id] = c.getBoundingClientRect().top);
+            board.innerHTML = '';
+            ranked.forEach((o, idx) => board.appendChild(optCard(o, idx)));
+            // FLIP: invert + play
+            board.querySelectorAll('.opt').forEach(c => {
+                const last = c.getBoundingClientRect().top; const d = (first[c.dataset.id] ?? last) - last;
+                if (d) { c.style.transform = `translateY(${d}px)`; c.style.transition = 'none'; requestAnimationFrame(() => { c.style.transition = ''; c.style.transform = ''; }); }
+            });
+        }
+
+        function optCard(o, idx) {
+            const c = consensusState(o);
+            const card = el('div', 'opt' + (o.won ? ' won' : (idx === 0 && c.total > 1 ? ' top' : '')));
+            card.dataset.id = o.id;
+            const maps = `https://www.openstreetmap.org/?mlat=${o.lat}&mlon=${o.lon}#map=18/${o.lat}/${o.lon}`;
+            const mem = liveMembers();
+            const tally = mem.map(m => {
+                const r = o.reactions[m.id];
+                const cls = r || 'pending';
+                const face = r === 'in' ? '😋' : r === 'ok' ? '🤔' : r === 'no' ? '🙅' : '⏳';
+                return `<span class="who ${cls}" title="${esc(m.name)}"><span class="fe">${esc(m.emoji)}</span>${face}</span>`;
+            }).join('');
+            const my = o.reactions[S.me.id];
+            const pct = c.total ? Math.round(c.ins / c.total * 100) : 0;
+            const blocked = c.nos > 0;
+            card.innerHTML = `
+                <div class="opt-head">
+                    <div class="opt-ic">${o.won ? '🏆' : (idx === 0 && c.total > 1 ? '🥇' : '🍽️')}${(o.won || (idx === 0 && c.total > 1)) ? `<span class="rankbadge">${o.won ? '✓' : '1'}</span>` : ''}</div>
+                    <div style="flex:1;min-width:0">
+                        <div class="opt-tt">${esc(o.name)}</div>
+                        <div class="opt-meta">
+                            ${o.cuisine ? `<span>${esc(o.cuisine)}</span>` : ''}
+                            <span><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg>${o.dist}m</span>
+                            <a href="${maps}" target="_blank" rel="noopener">map ↗</a>
+                        </div>
+                    </div>
+                </div>
+                ${o.pitch ? `<div class="opt-pitch">${esc(o.pitch)}</div>` : ''}
+                <div class="tally">${tally}</div>
+                ${o.won ? '' : `<div class="consensus"><div class="cbar ${blocked ? 'blocked' : ''}"><i style="width:${blocked ? 100 : pct}%"></i></div>
+                    <div class="clabel">${blocked ? `<b>${c.nos}</b> not keen — needs everyone in` : (c.ins === c.total ? 'everyone\'s in!' : `<b>${c.ins}/${c.total}</b> in · ${c.reacted < c.total ? (c.total - c.reacted) + ' to go' : 'needs everyone'}`)}</div></div>`}
+                ${o.won
+                    ? `<div class="won-foot"><span class="big">🎉</span><span>It's settled — enjoy!</span><a class="go" href="${maps}" target="_blank" rel="noopener">Directions</a></div>`
+                    : `<div class="react">
+                        <button class="rb in ${my === 'in' ? 'sel' : ''}" data-r="in" data-id="${o.id}"><span class="e">😋</span>I'm in</button>
+                        <button class="rb ok ${my === 'ok' ? 'sel' : ''}" data-r="ok" data-id="${o.id}"><span class="e">🤔</span>Meh</button>
+                        <button class="rb no ${my === 'no' ? 'sel' : ''}" data-r="no" data-id="${o.id}"><span class="e">🙅</span>Nope</button>
+                    </div>
+                    ${c.all ? `<button class="btn block lock-btn" data-lock="${o.id}" style="margin-top:11px;background:var(--green);box-shadow:0 10px 24px rgba(22,184,102,.32)"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> ${c.total > 1 ? "Everyone's in — lock it in" : 'Lock this in'}</button>` : ''}`}`;
+            if (!o.won) {
+                card.querySelector('.react').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; const op = findOpt(b.dataset.id); if (op) setMyReaction(op, b.dataset.r, true); };
+                const lock = card.querySelector('[data-lock]');
+                if (lock) lock.onclick = () => { const op = findOpt(o.id); if (op) finalizeOption(op); };
+            }
+            return card;
+        }
+
+        /* ============================ sheets ============================ */
+        function openSheet(id) { $('scrim').classList.add('show'); $(id).classList.add('show'); }
+        function closeSheets() { $('scrim').classList.remove('show'); document.querySelectorAll('.sheet').forEach(s => s.classList.remove('show')); }
+        $('scrim').onclick = closeSheets;
+        document.querySelectorAll('.grab').forEach(g => g.onclick = closeSheets);
+
+        function shareUrl() { return `${location.origin}${location.pathname}?t=${S.tableHost || S.me.id}`; }
+        let qrDone = false;
+        function openShare() {
+            const url = shareUrl();
+            $('share-link').textContent = url.replace(/^https?:\/\//, '');
+            const box = $('qrbox'); box.innerHTML = '';
+            try { new QRCode(box, { text: url, width: 168, height: 168, colorDark: '#211611', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M }); }
+            catch (_) { box.innerHTML = '<div style="color:var(--muted);font-size:.85rem">QR unavailable — use the link</div>'; }
+            openSheet('sheet-share');
+        }
+        $('share-copy').onclick = () => { navigator.clipboard.writeText(shareUrl()).then(() => toast('Link copied!', 'good')); };
+        $('share-native').onclick = async () => {
+            const url = shareUrl();
+            if (navigator.share) { try { await navigator.share({ title: 'Join my MatchMeal table', text: "Let's pick where to eat — tap to join:", url }); } catch (_) {} }
+            else { navigator.clipboard.writeText(url).then(() => toast('Link copied!', 'good')); }
+        };
+
+        function syncSettingsSheet() {
+            $('sw-ai').className = 'switch' + (S.settings.ai ? ' on' : '') + (AI.available ? '' : ' dis');
+            $('sw-auto').className = 'switch' + (S.settings.autoRespond ? ' on' : '');
+            $('ai-badge').textContent = AI.available ? '' : '(not available here)';
+            $('ai-desc').textContent = AI.available ? 'Your on-device AI reacts to options for you.' : 'Needs Chrome with built-in AI (desktop). You can still auto-react from your taste.';
+        }
+        $('sw-ai').onclick = () => { if (!AI.available) { toast('On-device AI isn’t available in this browser.', 'bad'); return; } S.settings.ai = !S.settings.ai; S.save(); syncSettingsSheet(); haptic(); };
+        $('sw-auto').onclick = () => { S.settings.autoRespond = !S.settings.autoRespond; S.save(); syncSettingsSheet(); if (S.settings.autoRespond) autoRespondAll(); haptic(); };
+        $('leave-table').onclick = () => { if (confirm('Start a brand-new empty table? Current options will clear for you.')) { S.options = []; renderApp(); closeSheets(); } };
+        $('edit-taste').onclick = () => { closeSheets(); openTaste(); };
+
+        // taste editor sheet
+        function openTaste() {
+            const cu = $('taste-cuisines'); cu.innerHTML = CUISINES.map(c => chipHtml(c)).join('');
+            cu.onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; cycleCuisine(b.dataset.c); cu.innerHTML = CUISINES.map(c => chipHtml(c)).join(''); haptic(); };
+            const di = $('taste-diet'); di.innerHTML = DIET.map(d => `<button class="chip ${S.me.diet.includes(d) ? 'on' : ''}" data-d="${esc(d)}"><span class="e">${d.split(' ')[0]}</span> ${d.split(' ').slice(1).join(' ')}</button>`).join('');
+            di.onclick = e => { const b = e.target.closest('[data-d]'); if (!b) return; const d = b.dataset.d; S.me.diet.includes(d) ? S.me.diet = S.me.diet.filter(x => x !== d) : S.me.diet.push(d); b.classList.toggle('on'); haptic(); };
+            const bu = $('taste-budget'); bu.innerHTML = BUDGETS.map(([b, l]) => `<button class="opt ${S.me.budget === b ? 'on' : ''}" data-b="${b}">${b}<div style="font-size:.7rem;font-weight:600;color:var(--muted)">${l}</div></button>`).join('');
+            bu.onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; S.me.budget = b.dataset.b; bu.querySelectorAll('.opt').forEach(x => x.classList.toggle('on', x === b)); haptic(); };
+            const ra = $('taste-radius'); ra.innerHTML = RADII.map(([e2, l, v]) => `<button class="opt ${S.me.radius === v ? 'on' : ''}" data-v="${v}">${e2}<div style="font-size:.7rem;font-weight:600;color:var(--muted)">${l}</div></button>`).join('');
+            ra.onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; S.me.radius = +b.dataset.v; ra.querySelectorAll('.opt').forEach(x => x.classList.toggle('on', x === b)); haptic(); };
+            openSheet('sheet-taste');
+        }
+        $('taste-save').onclick = () => { S.save(); broadcastPrefs(); closeSheets(); toast('Taste saved & shared with your table', 'good'); renderApp(); };
+        function broadcastPrefs() { if (Mesh.online) Mesh.emit('HELLO', { name: S.me.name, emoji: S.me.emoji, prefs: S.myPrefs(), peers: [...Mesh.conns.keys()] }); }
+
+        // location sheet
+        $('loc-gps').onclick = async () => {
+            $('loc-gps').textContent = 'Locating…';
+            try { const { lat, lon } = await gps(); const label = await reverse(lat, lon); S.loc = { lat, lon, label }; S.save(); closeSheets(); toast('Location set: ' + label, 'good'); renderApp(); }
+            catch (_) { toast('Could not get location — type a place instead.', 'bad'); }
+            $('loc-gps').innerHTML = `<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> Use my current location`;
+        };
+        $('loc-find').onclick = async () => {
+            const q = $('loc-q').value.trim(); if (!q) return;
+            $('loc-result').innerHTML = '<div style="color:var(--muted);font-size:.9rem;padding:6px 2px">Searching…</div>';
+            try { const r = await geocode(q); $('loc-result').innerHTML = `<button class="pick-card on" id="loc-use"><div class="pc-ic">📍</div><div style="flex:1"><div class="pc-t">${esc(r.label)}</div><div class="pc-d">Tap to use this</div></div></button>`; $('loc-use').onclick = () => { S.loc = r; S.save(); closeSheets(); toast('Location set', 'good'); renderApp(); }; }
+            catch (_) { $('loc-result').innerHTML = '<div style="color:var(--red);font-size:.9rem;padding:6px 2px">Couldn’t find that place.</div>'; }
+        };
+
+        /* ============================ celebration ============================ */
+        function showCelebration(o) {
+            $('cele-name').textContent = o.name;
+            const c = consensusState(o);
+            $('cele-sub').textContent = c.total > 1 ? `All ${c.total} of you are in. Time to eat!` : 'Locked in. Time to eat!';
+            $('cele-go').onclick = () => window.open(`https://www.openstreetmap.org/?mlat=${o.lat}&mlon=${o.lon}#map=18/${o.lat}/${o.lon}`, '_blank');
+            $('celebrate').classList.add('show');
+            confetti(); haptic(40);
+        }
+        $('cele-close').onclick = () => { $('celebrate').classList.remove('show'); };
+
+        function confetti() {
+            const cv = $('confetti'); cv.classList.add('show');
+            const ctx = cv.getContext('2d'); const W = cv.width = innerWidth, H = cv.height = innerHeight;
+            const cols = ['#ff5a36', '#ff9e2c', '#16b866', '#f0506a', '#5b8def', '#ffd166'];
+            const P = Array.from({ length: 140 }, () => ({ x: W / 2 + (Math.random() - .5) * 120, y: H * .38, vx: (Math.random() - .5) * 14, vy: Math.random() * -16 - 4, g: .4 + Math.random() * .3, s: 5 + Math.random() * 7, c: cols[Math.floor(Math.random() * cols.length)], r: Math.random() * 6, vr: (Math.random() - .5) * .4 }));
+            let t = 0;
+            (function tick() {
+                ctx.clearRect(0, 0, W, H); t++;
+                P.forEach(p => { p.vy += p.g; p.x += p.vx; p.y += p.vy; p.r += p.vr; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * .6); ctx.restore(); });
+                if (t < 160) requestAnimationFrame(tick); else { ctx.clearRect(0, 0, W, H); cv.classList.remove('show'); }
+            })();
+        }
+
+        /* ============================ boot ============================ */
+        async function boot() {
+            // bring my node online
+            try { await Mesh.start(); } catch (e) { console.error(e); }
+            // auto-join a table from the link
+            const t = new URLSearchParams(location.search).get('t');
+            if (t && t !== S.me.id) { S.tableHost = t; setTimeout(() => Mesh.connect(t), 600); }
+            render();
+            // share prompt for fresh hosts
+            if (!t) setTimeout(() => { if (!Mesh.conns.size) openShare(); }, 700);
+        }
+
+        async function init() {
+            S.load();
+            // Render immediately so a slow AI probe can never blank the screen.
+            if (S.onboarded) boot(); else { obStep = 0; renderOnboard(); }
+            // Detect on-device AI in the background, then refresh AI-dependent UI.
+            AI.detect().then(() => {
+                if (!AI.available) S.settings.ai = false;
+                if (CUR === 'ob' && obStep === 3) renderOnboard();
+            }).catch(() => {});
+        }
+        document.addEventListener('DOMContentLoaded', init);
+        if (document.readyState !== 'loading') init();
+        addEventListener('resize', () => { if (CUR === 'app' && $('confetti').classList.contains('show')) { $('confetti').width = innerWidth; $('confetti').height = innerHeight; } });
+    </script>
+</body>
+
+</html>
