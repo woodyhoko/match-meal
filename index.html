@@ -144,12 +144,12 @@
             #board .opt { margin-bottom: 0; }
             #board .empty, #board .skel:first-child { grid-column: 1 / -1; }
             .footnote { grid-column: 1 / -1; }
-            /* bottom sheets become centered modal dialogs on desktop */
-            .sheet { left: 50%; right: auto; top: 50%; bottom: auto; margin: 0; max-width: 460px; border-radius: 24px; max-height: 86dvh; transform: translate(-50%, -46%); opacity: 0; transition: transform .32s var(--ease), opacity .28s var(--ease); }
-            .sheet.show { transform: translate(-50%, -50%); opacity: 1; }
-            .grab { display: none; }
-            .sheet h3 { margin-top: 8px; }
+            /* (desktop sheet→modal rules live just after the base .sheet rules below,
+               so they win the source-order cascade) */
         }
+        .sheet-x { display: none; place-items: center; position: absolute; top: 16px; right: 16px; width: 34px; height: 34px; border-radius: 11px; background: var(--bg-2); color: var(--ink-2); font-size: 1.05rem; line-height: 1; z-index: 2; transition: transform .12s var(--ease), background .15s; }
+        .sheet-x:hover { background: var(--line-2); color: var(--ink); }
+        .sheet-x:active { transform: scale(.9); }
         .sheet { pointer-events: none; }
         .sheet.show { pointer-events: auto; }
 
@@ -347,6 +347,18 @@
             max-height: 90dvh; overflow-y: auto; transform: translateY(102%); transition: transform .42s var(--ease);
         }
         .sheet.show { transform: translateY(0); }
+        /* Desktop: a compact, centered modal dialog (placed after base .sheet so it wins). */
+        @media (min-width: 900px) {
+            .sheet {
+                left: 50%; right: auto; top: 50%; bottom: auto; margin: 0; width: calc(100% - 48px); max-width: 380px;
+                border-radius: 22px; max-height: 84dvh; padding: 26px 26px 28px;
+                transform: translate(-50%, -48%) scale(.97); opacity: 0; transition: transform .3s var(--ease), opacity .24s var(--ease);
+            }
+            .sheet.show { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            .grab { display: none; }
+            .sheet h3 { margin-top: 0; }
+            .sheet-x { display: grid; }
+        }
         .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line-2); margin: 6px auto 14px; }
         .sheet h3 { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; margin: 0 0 4px; }
         .sheet .sub { color: var(--ink-2); font-size: .96rem; line-height: 1.5; margin: 0 0 18px; }
@@ -402,6 +414,7 @@
     <!-- Share sheet -->
     <div class="sheet" id="sheet-share">
         <div class="grab"></div>
+        <button class="sheet-x" aria-label="Close">✕</button>
         <h3>Invite the table</h3>
         <p class="sub">Send this link. Whoever opens it joins instantly — no app, no sign-up.</p>
         <div class="qrbox" id="qrbox"></div>
@@ -415,6 +428,7 @@
     <!-- Settings sheet -->
     <div class="sheet" id="sheet-settings">
         <div class="grab"></div>
+        <button class="sheet-x" aria-label="Close">✕</button>
         <h3>Your settings</h3>
         <p class="sub">Choose how you respond to options. Everything stays on your device.</p>
         <div class="field-label">How you respond</div>
@@ -427,6 +441,7 @@
     <!-- Taste sheet (edit later) -->
     <div class="sheet" id="sheet-taste">
         <div class="grab"></div>
+        <button class="sheet-x" aria-label="Close">✕</button>
         <h3>Your taste</h3>
         <p class="sub">Tap once to love, twice to avoid. This is shared with your table so the search fits everyone.</p>
         <div class="field-label">Cuisines</div>
@@ -443,6 +458,7 @@
     <!-- Location sheet -->
     <div class="sheet" id="sheet-loc">
         <div class="grab"></div>
+        <button class="sheet-x" aria-label="Close">✕</button>
         <h3>Where are you?</h3>
         <p class="sub">We use this to find real places nearby. It never leaves your device.</p>
         <button class="btn block" id="loc-gps" style="margin-bottom:14px"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> Use my current location</button>
@@ -549,25 +565,57 @@
                 } catch (_) { this.available = false; }
                 return this.available;
             },
-            async react(option) {
-                // returns {r, reason}
-                const schema = { type: 'object', properties: { r: { type: 'string', enum: ['in', 'ok', 'no'] }, reason: { type: 'string' } }, required: ['r'] };
+            reactPrompt(option) {
                 const p = S.me;
-                const prompt = `You react on behalf of a diner to a restaurant suggestion. Reply ONLY as JSON.
+                return `You react on behalf of a diner to a restaurant suggestion. Reply ONLY as JSON.
 Diner loves: ${p.loves.join(', ') || 'anything'}. Avoids: ${p.avoids.join(', ') || 'nothing'}. Diet: ${p.diet.join(', ') || 'none'}. Budget up to ${p.budget}.
 Suggestion: "${option.name}" (${option.cuisine || 'unknown'}), ${option.dist}m away.
 Pick "in" (happy to go), "ok" (fine, minor worry), or "no" (won't go). One short reason.
 JSON: {"r":"in|ok|no","reason":"..."}`;
+            },
+            parseReact(text) {
+                try { const o = JSON.parse(extractJson(text)); if (['in', 'ok', 'no'].includes(o.r)) return { r: o.r, reason: (o.reason || '').trim() }; } catch (_) {}
+                return null;
+            },
+            // On-device (Chrome built-in Prompt API)
+            async react(option) {
+                const schema = { type: 'object', properties: { r: { type: 'string', enum: ['in', 'ok', 'no'] }, reason: { type: 'string' } }, required: ['r'] };
                 try {
                     const s = await window.LanguageModel.create();
                     let raw;
-                    try { raw = await s.prompt(prompt, { responseConstraint: schema }); } finally { s.destroy(); }
-                    const o = JSON.parse(extractJson(raw));
-                    if (['in', 'ok', 'no'].includes(o.r)) return { r: o.r, reason: (o.reason || '').trim() };
-                } catch (e) { console.warn('AI react failed', e); }
-                return null;
+                    try { raw = await s.prompt(this.reactPrompt(option), { responseConstraint: schema }); } finally { s.destroy(); }
+                    return this.parseReact(raw);
+                } catch (e) { console.warn('AI react failed', e); return null; }
+            },
+            // Keyless online fallback (Puter.js — free, no API key, works on any browser).
+            async cloudReact(option) {
+                if (!(await ensurePuter())) return null;
+                try {
+                    const r = await Promise.race([
+                        puter.ai.chat(this.reactPrompt(option)),
+                        new Promise((_, rej) => setTimeout(() => rej(new Error('cloud timeout')), 12000))
+                    ]);
+                    const text = (r && r.message && r.message.content) || (r && r.text) || (typeof r === 'string' ? r : '');
+                    return this.parseReact(text);
+                } catch (e) { console.warn('cloud react failed', e); return null; }
             }
         };
+        // Lazy-load Puter only when cloud AI is actually used, so the default
+        // experience stays dependency-free and nothing phones home unless chosen.
+        let puterPromise = null;
+        function ensurePuter() {
+            if (typeof puter !== 'undefined') return Promise.resolve(true);
+            if (puterPromise) return puterPromise;
+            puterPromise = new Promise(res => {
+                const s = document.createElement('script');
+                s.src = 'https://js.puter.com/v2/';
+                s.onload = () => res(typeof puter !== 'undefined');
+                s.onerror = () => res(false);
+                document.head.appendChild(s);
+                setTimeout(() => res(typeof puter !== 'undefined'), 8000); // never hang the loop
+            });
+            return puterPromise;
+        }
         function extractJson(t) {
             if (!t) return '{}';
             const s = t.indexOf('{'); if (s < 0) return t;
@@ -764,6 +812,7 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
                     if (o.won || o.reactions[S.me.id]) continue;
                     let v = null;
                     if (S.settings.mode === 'ai' && AI.available) v = await AI.react(o);
+                    else if (S.settings.mode === 'cloud') v = await AI.cloudReact(o);
                     if (!v) v = smartReact(o);
                     setMyReaction(o, v.r, false);
                 }
@@ -1032,7 +1081,8 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
         function openSheet(id) { $('scrim').classList.add('show'); $(id).classList.add('show'); }
         function closeSheets() { $('scrim').classList.remove('show'); document.querySelectorAll('.sheet').forEach(s => s.classList.remove('show')); }
         $('scrim').onclick = closeSheets;
-        document.querySelectorAll('.grab').forEach(g => g.onclick = closeSheets);
+        document.querySelectorAll('.grab, .sheet-x').forEach(g => g.onclick = closeSheets);
+        addEventListener('keydown', e => { if (e.key === 'Escape') closeSheets(); });
 
         function shareUrl() { return `${location.origin}${location.pathname}?t=${S.tableHost || S.me.id}`; }
         let qrDone = false;
@@ -1055,7 +1105,8 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
         const MODES = [
             { key: 'manual', ico: '👆', t: "I'll tap myself", d: 'Review each option and react when you want.' },
             { key: 'taste', ico: '⚡', t: 'Auto from my taste', d: 'React instantly from your preferences — no AI, works on any phone.' },
-            { key: 'ai', ico: '🧠', t: 'Auto with on-device AI', d: 'Smarter, nuanced reactions. Stays on your device.' }
+            { key: 'ai', ico: '🧠', t: 'Auto with on-device AI', d: 'Smarter, nuanced reactions. Stays private on your device.' },
+            { key: 'cloud', ico: '☁️', t: 'Auto with cloud AI', d: 'Smart reactions via a free online service — works on any phone. Sends your picks to that service.' }
         ];
         function modeCardsHtml(sel) {
             return MODES.map(m => {
