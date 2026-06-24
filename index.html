@@ -327,25 +327,40 @@
         #members-list .mr-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); flex: 0 0 auto; }
         #members-list .mr-dot.off { background: var(--faint); }
         #saved-list { max-height: 56vh; overflow-y: auto; }
-        #saved-list .srow { display: flex; align-items: center; gap: 8px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+        #saved-list { max-height: 52vh; overflow-y: auto; }
+        #saved-list .srow { padding: 11px 2px; border-bottom: 1px solid var(--line); }
         #saved-list .srow:last-child { border-bottom: none; }
-        #saved-list .sr-meta { flex: 1; min-width: 0; }
-        #saved-list .sr-n { font-weight: 700; font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        #saved-list .sr-r { font-size: .76rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        #saved-list .sr-seg { display: flex; gap: 3px; flex: 0 0 auto; }
-        #saved-list .sr-b { width: 32px; height: 32px; border-radius: 9px; background: var(--bg-2); border: 1.5px solid transparent; font-size: 1rem; opacity: .5; transition: .12s; }
+        #saved-list .sr-top { display: flex; align-items: center; gap: 8px; }
+        #saved-list .sr-name { flex: 1; min-width: 0; font-weight: 700; font-size: .98rem; color: var(--ink); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #saved-list .sr-name:hover { color: var(--accent); }
+        #saved-list .sr-r { font-size: .78rem; color: var(--muted); margin: 2px 0 0; }
+        #saved-list .sr-controls { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+        #saved-list .sr-seg { display: flex; gap: 3px; }
+        #saved-list .sr-b { width: 34px; height: 32px; border-radius: 9px; background: var(--bg-2); border: 1.5px solid transparent; font-size: 1rem; opacity: .5; transition: .12s; }
         #saved-list .sr-b.sel { opacity: 1; }
         #saved-list .sr-b.sel.in { background: var(--green-soft); border-color: var(--green); }
         #saved-list .sr-b.sel.ok { background: var(--yellow-soft); border-color: var(--yellow); }
         #saved-list .sr-b.sel.no { background: var(--red-soft); border-color: var(--red); }
+        #saved-list .sr-vis { display: inline-flex; align-items: center; gap: 7px; font-size: .8rem; color: var(--muted); font-weight: 600; }
+        #saved-list .sr-step { width: 26px; height: 26px; border-radius: 8px; background: var(--bg-2); color: var(--ink-2); font-size: 1rem; line-height: 1; }
+        #saved-list .sr-vis b { color: var(--ink); }
         #saved-list .sr-del { width: 30px; height: 30px; border-radius: 9px; background: var(--bg-2); color: var(--muted); flex: 0 0 auto; font-size: .85rem; }
         #saved-list .sr-del:hover { color: var(--red); }
+        #saved-list .sr-cmt { width: 100%; margin-top: 8px; padding: 8px 11px; font-size: .85rem; }
+        #tables-list .trow { display: flex; align-items: center; gap: 10px; padding: 12px 2px; border-bottom: 1px solid var(--line); }
+        #tables-list .trow:last-child { border-bottom: none; }
+        #tables-list .tr-meta { flex: 1; min-width: 0; }
+        #tables-list .tr-id { font-weight: 700; font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #tables-list .tr-when { font-size: .74rem; color: var(--faint); }
+        #tables-list .tr-res { font-size: .85rem; color: var(--green); font-weight: 600; margin-top: 3px; }
+        #tables-list .tr-res.tr-none { color: var(--faint); font-weight: 400; font-style: italic; }
+        #tables-list .btn-rejoin { flex: 0 0 auto; padding: 8px 14px; }
         .lead-banner { align-items: center; gap: 12px; padding: 13px 16px; border-radius: 16px; margin-bottom: 14px; background: linear-gradient(120deg, var(--amber-soft), var(--accent-soft)); border: 1px solid var(--line); animation: fadeUp .35s var(--ease) both; }
         .lead-banner.won { background: var(--green-soft); border-color: var(--green); }
         .lead-banner .lb-ico { font-size: 1.7rem; }
-        .lead-banner .lb-x { min-width: 0; }
-        .lead-banner .lb-t { font-weight: 800; font-size: 1.02rem; letter-spacing: -.01em; }
-        .lead-banner .lb-s { font-size: .82rem; color: var(--ink-2); margin-top: 1px; }
+        .lead-banner .lb-x { min-width: 0; flex: 1; }
+        .lead-banner .lb-t { font-weight: 800; font-size: 1.02rem; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .lead-banner .lb-s { font-size: .82rem; color: var(--ink-2); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .lead-banner.won .lb-t, .lead-banner.won .lb-s { color: var(--green); }
         .sortbtn { font-size: .76rem; font-weight: 700; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; cursor: pointer; box-shadow: var(--shadow-sm); transition: transform .12s var(--ease), background .15s, color .15s, border-color .15s; margin-left: 10px; }
         .sortbtn:active { transform: scale(.94); }
@@ -374,6 +389,10 @@
         .tally .who.ok { background: var(--yellow-soft); color: #b9791a; }
         .tally .who.no { background: var(--red-soft); color: var(--red); }
         .tally .who.pending { opacity: .65; }
+        .tally .who.has-note { cursor: pointer; }
+        .tally .who.has-note::after { content: '💬'; font-size: .62rem; margin-left: 1px; opacity: .6; }
+        .tally .who.open { outline: 2px solid var(--accent); outline-offset: 1px; }
+        .who-comment { margin-top: 10px; font-size: .86rem; line-height: 1.45; color: var(--ink-2); background: var(--bg-2); border-radius: 12px; padding: 9px 12px; }
 
         /* consensus bar */
         .consensus { margin-top: 13px; }
@@ -510,6 +529,7 @@
         <button class="btn ghost block" id="edit-taste" style="margin-top:18px"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Edit my taste</button>
         <button class="btn ghost block" id="who-here" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg> Who's at the table</button>
         <button class="btn ghost block" id="saved-prefs" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> Saved choices &amp; history</button>
+        <button class="btn ghost block" id="past-tables" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 4-6"/></svg> Past tables</button>
         <button class="btn soft block" id="leave-table" style="margin-top:10px">Start a fresh table</button>
         <div class="footnote">MatchMeal · © 2026 woodyhoko</div>
     </div>
@@ -528,9 +548,26 @@
         <div class="grab"></div>
         <button class="sheet-x" aria-label="Close">✕</button>
         <h3>Saved choices</h3>
-        <p class="sub">Decisions you've made before — reused automatically when the same place comes up again. Tap to change, or remove any.</p>
+        <p class="sub">Decisions you've made before — reused automatically when the same place comes up again. Tap the name to open it in Maps; adjust, count visits, or add a note.</p>
+        <div class="field-label">Sort by</div>
+        <div class="seg" id="saved-sort" style="margin-bottom:14px">
+            <div class="opt active" data-s="recent">Recent</div>
+            <div class="opt" data-s="name">Name</div>
+            <div class="opt" data-s="rating">Rating</div>
+            <div class="opt" data-s="visits">Visits</div>
+            <div class="opt" data-s="nearby">Nearby</div>
+        </div>
         <div id="saved-list"></div>
         <button class="btn soft block" id="saved-clear" style="margin-top:14px">Clear all saved choices</button>
+    </div>
+
+    <!-- Past tables sheet -->
+    <div class="sheet" id="sheet-tables">
+        <div class="grab"></div>
+        <button class="sheet-x" aria-label="Close">✕</button>
+        <h3>Past tables</h3>
+        <p class="sub">Tables you've been part of, and what got locked in. Tap to rejoin if it's still going.</p>
+        <div id="tables-list"></div>
     </div>
 
     <!-- Taste sheet (edit later) -->
@@ -848,7 +885,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             }
             if (e.type === 'FINALIZE') {
                 const o = findOpt(p.optionId); if (!o || o.won) return;
-                o.won = true; o.wonBy = p.byName || e.fromName || 'someone'; S.options.forEach(x => { if (x.id !== o.id) x.won = false; }); renderApp(); showCelebration(o); return;
+                o.won = true; o.wonBy = p.byName || e.fromName || 'someone'; S.options.forEach(x => { if (x.id !== o.id) x.won = false; }); recordResult(o); renderApp(); showCelebration(o); return;
             }
         }
 
@@ -952,7 +989,8 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             o.notes[S.me.id] = note;
             // Remember my decision for this restaurant so it carries across tables.
             S.me.history = S.me.history || {};
-            S.me.history[o.name.toLowerCase()] = { name: o.name, r, score: note.score || null, reason: note.reason || '', by: note.by, ts: now() };
+            const hk = o.name.toLowerCase(), prev = S.me.history[hk] || {};
+            S.me.history[hk] = { name: o.name, lat: o.lat, lon: o.lon, r, score: note.score || null, reason: note.reason || '', by: note.by, ts: now(), visits: prev.visits || 0, userComment: prev.userComment || '' };
             capHistory(); S.save();
             Mesh.emit('REACT', { optionId: o.id, r, score: note.score, reason: note.reason });
             renderApp();
@@ -966,7 +1004,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             if (!c.all) { toast('Everyone needs to be in first.', 'bad'); return; }
             o.won = true; o.wonBy = S.me.name; S.options.forEach(x => { if (x.id !== o.id) x.won = false; });
             Mesh.emit('FINALIZE', { optionId: o.id, byName: S.me.name });
-            renderApp(); showCelebration(o);
+            recordResult(o); renderApp(); showCelebration(o);
         }
 
         // Consensus = every LIVE member is "in". Decided by all parties.
@@ -1142,6 +1180,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
                 const openSettings = () => { syncSettingsSheet(); openSheet('sheet-settings'); };
                 $('open-settings').onclick = openSettings;
                 $('mode-chip').onclick = openSettings;
+                $('statpill').onclick = openMembers; $('statpill').style.cursor = 'pointer'; $('statpill').title = "See who's at the table";
                 $('find-btn').onclick = findPlaces;
                 $('sort-btn').onclick = () => { sortByRank = !sortByRank; renderBoard(); haptic(); toast(sortByRank ? 'Sorted by best match — updates live' : 'Back to the order they arrived', ''); };
                 $('locbar').onclick = () => openSheet('sheet-loc');
@@ -1192,8 +1231,9 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
         }
 
         // ---- board: stable order by default; only sort on demand ----
-        let sortByRank = false;
+        let sortByRank = false, lastOrderKey = '';
         const cardEls = new Map();
+        const revealed = new Map(); // optionId -> memberId whose comment is shown
         function displayOptions() {
             if (sortByRank) return rankedOptions();
             // keep the arrival order while people respond; pin a finalized pick on top
@@ -1215,8 +1255,12 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
                 cardEls.clear(); updateSortBtn(); return;
             }
             if (board.querySelector('.empty') || board.querySelector('.skel')) { board.innerHTML = ''; cardEls.clear(); }
+            // Only animate when the ORDER actually changes (sort/new card/won pin).
+            // Reacting to one card never reorders, so siblings stay put — no jumping.
+            const orderKey = list.map(o => o.id).join(',');
+            const orderChanged = orderKey !== lastOrderKey;
             const first = {};
-            cardEls.forEach((c, id) => { const r = c.getBoundingClientRect(); first[id] = { x: r.left, y: r.top }; });
+            if (orderChanged) cardEls.forEach((c, id) => { const r = c.getBoundingClientRect(); first[id] = { x: r.left, y: r.top }; });
             const leaderId = (rankedOptions()[0] || {}).id;
             const fresh = new Set();
             list.forEach(o => {
@@ -1226,16 +1270,18 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
                 board.appendChild(c);
             });
             [...cardEls.keys()].forEach(id => { if (!list.find(o => o.id === id)) { cardEls.get(id).remove(); cardEls.delete(id); } });
-            // FLIP — gentle, only cards that actually moved (and not the just-created ones)
-            cardEls.forEach((c, id) => {
-                if (fresh.has(c)) return;
-                const f = first[id]; if (!f) return;
-                const r = c.getBoundingClientRect(); const dx = f.x - r.left, dy = f.y - r.top;
-                if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
-                    c.style.transform = `translate(${dx}px, ${dy}px)`; c.style.transition = 'none';
-                    requestAnimationFrame(() => { c.style.transition = 'transform .5s cubic-bezier(.4,0,.15,1)'; c.style.transform = ''; });
-                }
-            });
+            if (orderChanged) {
+                cardEls.forEach((c, id) => {
+                    if (fresh.has(c)) return;
+                    const f = first[id]; if (!f) return;
+                    const r = c.getBoundingClientRect(); const dx = f.x - r.left, dy = f.y - r.top;
+                    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+                        c.style.transform = `translate(${dx}px, ${dy}px)`; c.style.transition = 'none';
+                        requestAnimationFrame(() => { c.style.transition = 'transform .5s cubic-bezier(.4,0,.15,1)'; c.style.transform = ''; });
+                    }
+                });
+            }
+            lastOrderKey = orderKey;
             updateSortBtn();
         }
         function updateSortBtn() {
@@ -1275,7 +1321,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
                     <div class="lockwrap"></div>
                 </div>
                 <div class="ai-note" hidden></div>
-                <div class="objections"></div>`;
+                <div class="who-comment" hidden></div>`;
         }
         // Update a region ONLY when its content changed — no whole-card rebuild, no flash.
         function setRegion(elm, html) { if (elm && elm.dataset.h !== html) { elm.dataset.h = html; elm.innerHTML = html; return true; } return false; }
@@ -1294,13 +1340,15 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             if (o._think) noteHtml = `<span class="thinking">🧠 thinking<span class="dots"><i></i><i></i><i></i></span></span>`;
             else if (myNote && myNote.reason && (myNote.by === 'ai' || myNote.by === 'cloud')) noteHtml = `🧠 Your AI: “${esc(myNote.reason)}”`;
             if (setRegion(noteEl, noteHtml)) { noteEl.hidden = !noteHtml; if (noteHtml && !o._think) { noteEl.style.animation = 'none'; void noteEl.offsetWidth; noteEl.style.animation = 'aiIn .42s var(--ease)'; } }
-            // tally
+            // tally — tap a face to see that person's take; hover shows their status.
+            const sel = revealed.get(o.id);
             setRegion(card.querySelector('.tally'), mem.map(m => {
                 const r = o.reactions[m.id], rc = r || 'pending';
                 const face = r === 'in' ? '😋' : r === 'ok' ? '🤔' : r === 'no' ? '🙅' : '⏳';
-                const note = notes[m.id], why = note && note.reason ? ` — ${note.reason}` : '';
-                const label = r ? ({ in: 'in', ok: 'meh', no: 'no' }[r]) : 'waiting';
-                return `<span class="who ${rc}" title="${esc(m.name + ': ' + label + why)}"><span class="fe">${esc(m.emoji)}</span>${face}</span>`;
+                const note = notes[m.id], hasComment = note && note.reason;
+                const status = r ? ({ in: 'is in', ok: 'is unsure', no: 'said no' }[r]) : ((m.me && o._think) ? 'is thinking…' : 'is deciding…');
+                const tip = `${m.me ? 'You' : m.name} ${status}${hasComment ? ' · tap to read their note' : ''}`;
+                return `<span class="who ${rc}${hasComment ? ' has-note' : ''}${sel === m.id ? ' open' : ''}" data-mid="${m.id}" title="${esc(tip)}"><span class="fe">${esc(m.emoji)}</span>${face}</span>`;
             }).join(''));
             // consensus
             const consEl = card.querySelector('.consensus');
@@ -1309,9 +1357,11 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
                 const pct = c.total ? Math.round(c.ins / c.total * 100) : 0, blocked = c.nos > 0;
                 setRegion(consEl, `<div class="cbar ${blocked ? 'blocked' : ''}"><i style="width:${blocked ? 100 : pct}%"></i></div><div class="clabel">${blocked ? `<b>${c.nos}</b> not keen — needs everyone in` : (c.ins === c.total ? "everyone's in!" : `<b>${c.ins}/${c.total}</b> in · ${c.reacted < c.total ? (c.total - c.reacted) + ' to go' : 'needs everyone'}`)}</div>`);
             }
-            // objections
-            const objs = mem.filter(m => (o.reactions[m.id] === 'no' || o.reactions[m.id] === 'ok') && notes[m.id] && notes[m.id].reason);
-            setRegion(card.querySelector('.objections'), o.won ? '' : objs.map(m => `<div class="obj"><span class="oe">${esc(m.emoji)}</span> ${o.reactions[m.id] === 'no' ? '🙅' : '🤔'} <b>${esc(m.me ? 'You' : m.name)}</b>: <span class="or">${esc(notes[m.id].reason)}</span></div>`).join(''));
+            // a single member's comment, shown only when you tap their face
+            const wc = card.querySelector('.who-comment');
+            let wcHtml = '';
+            if (sel) { const m = mem.find(x => x.id === sel), note = notes[sel]; if (m) { const r = o.reactions[sel]; const st = r === 'in' ? "is in 😋" : r === 'ok' ? 'is unsure 🤔' : r === 'no' ? 'said no 🙅' : ((m.me && o._think) ? 'is thinking… 🧠' : 'is deciding…'); wcHtml = `<b>${esc(m.me ? 'You' : m.name)}</b> ${st}${note && note.reason ? ` — “${esc(note.reason)}”` : (r ? '' : '')}`; } }
+            if (setRegion(wc, wcHtml)) { wc.hidden = !wcHtml; if (wcHtml) { wc.style.animation = 'none'; void wc.offsetWidth; wc.style.animation = 'aiIn .3s var(--ease)'; } }
             // actions — toggle button classes instead of rebuilding, so pressing
             // a reaction never re-creates the buttons (no flash).
             const my = o.reactions[S.me.id];
@@ -1329,7 +1379,9 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             card.onclick = e => {
                 const rb = e.target.closest('[data-r]');
                 if (rb) { const op = findOpt(card.dataset.id); if (op && !op.won) setMyReaction(op, rb.dataset.r, true); return; }
-                if (e.target.closest('[data-lock]')) { const op = findOpt(card.dataset.id); if (op) finalizeOption(op); }
+                if (e.target.closest('[data-lock]')) { const op = findOpt(card.dataset.id); if (op) finalizeOption(op); return; }
+                const who = e.target.closest('.who[data-mid]');
+                if (who) { const id = card.dataset.id, mid = who.dataset.mid; revealed.set(id, revealed.get(id) === mid ? null : mid); const op = findOpt(id); if (op) paintCard(card, op, (rankedOptions()[0] || {}).id); haptic(); }
             };
         }
 
@@ -1415,29 +1467,76 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             openSheet('sheet-members');
         }
 
-        // saved choices / history — view, adjust, remove
-        function openSaved() { renderSaved(); openSheet('sheet-saved'); }
+        // saved choices / history — view, sort, adjust, count visits, note, remove
+        let savedSort = 'recent', savedOrder = [];
+        function computeSavedOrder() {
+            const h = S.me.history || {};
+            const dist = k => { const it = h[k]; return (S.loc && it.lat != null) ? haversine(S.loc.lat, S.loc.lon, it.lat, it.lon) : Infinity; };
+            const grade = k => { const it = h[k]; return it.score || (it.r === 'in' ? 5 : it.r === 'ok' ? 3 : 1); };
+            savedOrder = Object.keys(h).sort((a, b) => {
+                if (savedSort === 'name') return (h[a].name || a).localeCompare(h[b].name || b);
+                if (savedSort === 'rating') return grade(b) - grade(a);
+                if (savedSort === 'visits') return (h[b].visits || 0) - (h[a].visits || 0);
+                if (savedSort === 'nearby') return dist(a) - dist(b);
+                return (h[b].ts || 0) - (h[a].ts || 0);
+            });
+        }
+        function openSaved() { computeSavedOrder(); renderSaved(); $('saved-sort').querySelectorAll('.opt').forEach(o => o.classList.toggle('active', o.dataset.s === savedSort)); openSheet('sheet-saved'); }
         function renderSaved() {
             const h = S.me.history || {};
-            const items = Object.entries(h).map(([k, v]) => ({ k, ...v })).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+            const keys = savedOrder.filter(k => h[k]);   // keep order stable across edits
             const list = $('saved-list');
-            if (!items.length) { list.innerHTML = '<p class="sub">No saved choices yet. As you (or your AI) react to places, your decisions are remembered here.</p>'; return; }
-            list.innerHTML = items.map(it => `<div class="srow">
-                <div class="sr-meta"><div class="sr-n">${esc(it.name || it.k)}</div>${it.reason ? `<div class="sr-r">${esc(it.reason)}</div>` : ''}</div>
-                <div class="sr-seg">
-                    <button class="sr-b ${it.r === 'in' ? 'sel in' : ''}" data-k="${esc(it.k)}" data-r="in" title="happy to go">😋</button>
-                    <button class="sr-b ${it.r === 'ok' ? 'sel ok' : ''}" data-k="${esc(it.k)}" data-r="ok" title="meh">🤔</button>
-                    <button class="sr-b ${it.r === 'no' ? 'sel no' : ''}" data-k="${esc(it.k)}" data-r="no" title="no">🙅</button>
-                </div>
-                <button class="sr-del" data-del="${esc(it.k)}" title="Forget this">✕</button>
-            </div>`).join('');
+            if (!keys.length) { list.innerHTML = '<p class="sub">No saved choices yet. As you (or your AI) react to places, your decisions are remembered here.</p>'; return; }
+            list.innerHTML = keys.map(k => { const it = h[k]; const gm = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((it.name || k) + (it.lat != null ? ' ' + it.lat + ',' + it.lon : ''))}`;
+                return `<div class="srow">
+                    <div class="sr-top"><a class="sr-name" href="${gm}" target="_blank" rel="noopener" title="Open in Google Maps">${esc(it.name || k)} ↗</a><button class="sr-del" data-del="${esc(k)}" title="Forget this">✕</button></div>
+                    ${it.reason ? `<div class="sr-r">${esc(it.reason)}</div>` : ''}
+                    <div class="sr-controls">
+                        <div class="sr-seg">
+                            <button class="sr-b in ${it.r === 'in' ? 'sel' : ''}" data-k="${esc(k)}" data-r="in" title="happy to go">😋</button>
+                            <button class="sr-b ok ${it.r === 'ok' ? 'sel' : ''}" data-k="${esc(k)}" data-r="ok" title="meh">🤔</button>
+                            <button class="sr-b no ${it.r === 'no' ? 'sel' : ''}" data-k="${esc(k)}" data-r="no" title="no">🙅</button>
+                        </div>
+                        <div class="sr-vis">been <button class="sr-step" data-vis="${esc(k)}" data-d="-1">−</button><b>${it.visits || 0}×</b><button class="sr-step" data-vis="${esc(k)}" data-d="1">+</button></div>
+                    </div>
+                    <input class="sr-cmt input" data-cmt="${esc(k)}" placeholder="add your own note…" value="${esc(it.userComment || '')}" />
+                </div>`; }).join('');
         }
+        $('saved-sort').onclick = e => { const o = e.target.closest('[data-s]'); if (!o) return; savedSort = o.dataset.s; $('saved-sort').querySelectorAll('.opt').forEach(x => x.classList.toggle('active', x === o)); computeSavedOrder(); renderSaved(); haptic(); };
         $('saved-list').onclick = e => {
-            const rb = e.target.closest('[data-r]'), del = e.target.closest('[data-del]');
-            if (rb) { const it = S.me.history[rb.dataset.k]; if (it) { it.r = rb.dataset.r; it.by = 'you'; it.ts = now(); S.save(); renderSaved(); haptic(); } }
+            const rb = e.target.closest('[data-r]'), del = e.target.closest('[data-del]'), vis = e.target.closest('[data-vis]');
+            if (rb) { const it = S.me.history[rb.dataset.k]; if (it) { it.r = rb.dataset.r; it.by = 'you'; S.save(); renderSaved(); haptic(); } }       // keep order
+            else if (vis) { const it = S.me.history[vis.dataset.vis]; if (it) { it.visits = Math.max(0, (it.visits || 0) + (+vis.dataset.d)); S.save(); renderSaved(); haptic(); } }
             else if (del) { delete S.me.history[del.dataset.del]; S.save(); renderSaved(); haptic(); }
         };
-        $('saved-clear').onclick = () => { if (confirm('Clear all saved choices on this device?')) { S.me.history = {}; S.save(); renderSaved(); toast('Saved choices cleared.', 'good'); } };
+        $('saved-list').oninput = e => { const cm = e.target.closest('[data-cmt]'); if (cm) { const it = S.me.history[cm.dataset.cmt]; if (it) { it.userComment = cm.value; S.save(); } } }; // no re-render -> keeps focus
+        $('saved-clear').onclick = () => { if (confirm('Clear all saved choices on this device?')) { S.me.history = {}; savedOrder = []; S.save(); renderSaved(); toast('Saved choices cleared.', 'good'); } };
+
+        // past tables — what you joined and what got locked in
+        $('past-tables').onclick = () => { closeSheets(); openTables(); };
+        function currentTableId() { return S.tableHost || S.me.id; }
+        function recordResult(o) {
+            const id = currentTableId(); if (!id) return;
+            S.me.tableHistory = S.me.tableHistory || [];
+            let e = S.me.tableHistory.find(x => x.id === id);
+            if (!e) { e = { id, ts: now() }; S.me.tableHistory.unshift(e); }
+            e.result = { name: o.name, lat: o.lat, lon: o.lon, ts: now() }; e.ts = now();
+            if (S.me.tableHistory.length > 20) S.me.tableHistory.length = 20;
+            S.save();
+        }
+        function openTables() {
+            const list = $('tables-list');
+            const th = (S.me.tableHistory || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+            if (!th.length) { list.innerHTML = '<p class="sub">No past tables yet. Once you join or host a table, it shows up here with whatever got locked in.</p>'; openSheet('sheet-tables'); return; }
+            list.innerHTML = th.map(t => {
+                const when = new Date(t.ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                const res = t.result ? `<div class="tr-res">🏆 ${esc(t.result.name)}</div>` : '<div class="tr-res tr-none">no decision recorded</div>';
+                const mine = t.id === S.me.id;
+                return `<div class="trow"><div class="tr-meta"><div class="tr-id">${mine ? 'Your table' : 'Table ' + esc(t.id)}</div><div class="tr-when">${esc(when)}</div>${res}</div>${mine ? '' : `<button class="btn soft btn-rejoin" data-join="${esc(t.id)}">Rejoin</button>`}</div>`;
+            }).join('');
+            openSheet('sheet-tables');
+        }
+        $('tables-list').onclick = e => { const j = e.target.closest('[data-join]'); if (j) { const id = j.dataset.join; location.href = `${location.pathname}?t=${id}`; } };
 
         // taste editor sheet
         function openTaste() {

@@ -198,6 +198,8 @@ Plus a **rendering pass for smoothness**: card updates are now **region-level an
 
 And some session/quality-of-life items: the lock-in shows **who locked it in** (card + celebration), the celebration opens **Google Maps** for directions, the **invite link is stable across refreshes** and you **auto-rejoin your last table** when you reload, and there's a **Saved choices** manager to review, re-rate, or remove your remembered decisions. Ranking breaks ties on the **rating/grade** (so among equally-liked options the better-matched one wins), switching **into an AI mode re-assesses every option** on the table with fresh AI comments, and the free-text "Anything else?" note is labelled **AI-only** (it's read only in an AI mode).
 
+Latest polish: others' comments are **private until you tap their face** (hover shows their status, e.g. "Ada is deciding…"); reacting **no longer nudges other cards** (re-rank animation runs only when the order truly changes, and the leading banner keeps a fixed height); the **Saved choices** list now **sorts** by recent / name / rating / visits / nearby, tracks a per-place **visit count**, lets you **open it in Maps** and **add your own note**, and never re-sorts mid-edit; the top-right **status pill opens "who's at the table"**; and a new **Past tables** view shows the tables you've been in and **what got locked in**, with one-tap rejoin.
+
 ---
 
 ## License
