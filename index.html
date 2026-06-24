@@ -275,6 +275,8 @@
         .find-wrap { margin-bottom: 18px; }
         .find-head h2 { font-size: 1.12rem; font-weight: 800; letter-spacing: -.02em; margin: 0 0 5px; }
         .find-explain { font-size: .84rem; color: var(--muted); line-height: 1.5; margin: 0 0 13px; }
+        .chip-hint { font-size: .76rem; color: var(--muted); line-height: 1.5; margin: 6px 2px 0; }
+        .chip-hint b { color: var(--ink-2); }
         .find-hint { text-align: center; color: var(--ink-2); font-size: .82rem; margin-top: 10px; line-height: 1.45; }
         .modechip { display: flex; align-items: center; gap: 9px; width: 100%; margin-top: 12px; padding: 10px 13px; border-radius: 13px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow-sm); font-size: .85rem; font-weight: 600; color: var(--ink-2); transition: transform .12s var(--ease), background .15s; }
         .modechip:active { transform: scale(.98); background: var(--bg-2); }
@@ -545,8 +547,9 @@
         <div class="seg" id="taste-budget" style="margin-bottom:18px"></div>
         <div class="field-label">How far?</div>
         <div class="seg" id="taste-radius" style="margin-bottom:18px"></div>
-        <div class="field-label">Anything else? (your own words)</div>
-        <textarea class="input" id="taste-custom" rows="2" placeholder="e.g. love spicy food, hate loud places, prefer patios. Your AI will honour this." style="margin-bottom:4px"></textarea>
+        <div class="field-label">Anything else? <span style="text-transform:none;letter-spacing:0;color:var(--accent);font-weight:700">🧠 AI only</span></div>
+        <textarea class="input" id="taste-custom" rows="2" placeholder="e.g. love spicy food, hate loud places, prefer patios." style="margin-bottom:4px"></textarea>
+        <div class="chip-hint">Free-text notes are only read when you pick an <b>AI</b> response mode (on-device or cloud). The Manual and “Auto from my taste” modes can't interpret free text — they use the chips above.</div>
         <button class="btn block" id="taste-save" style="margin-top:18px">Save</button>
     </div>
 
@@ -919,17 +922,19 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
         }
         const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
 
-        // React to options that I haven't reacted to yet (auto mode).
+        // React to options in auto mode. force=true RE-ASSESSES every option with the
+        // current brain (used when you switch into an AI mode), bypassing the
+        // "already reacted" skip and the per-restaurant history shortcut.
         let autoBusy = false;
-        async function autoRespondAll() {
+        async function autoRespondAll(force = false) {
             if (S.settings.mode === 'manual' || autoBusy) return;
             autoBusy = true;
             try {
                 for (const o of S.options) {
-                    if (o.won || o.reactions[S.me.id]) continue;
+                    if (o.won) continue;
+                    if (!force && o.reactions[S.me.id]) continue;
                     // If I've decided on this exact place before, reuse that decision directly.
-                    const past = (S.me.history || {})[o.name.toLowerCase()];
-                    if (past) { setMyReaction(o, past.r, false, { score: past.score || null, reason: (past.reason || 'as before') + ' · remembered', by: past.by || 'history' }); continue; }
+                    if (!force) { const past = (S.me.history || {})[o.name.toLowerCase()]; if (past) { setMyReaction(o, past.r, false, { score: past.score || null, reason: (past.reason || 'as before') + ' · remembered', by: past.by || 'history' }); continue; } }
                     let v = null, byAI = false;
                     if (S.settings.mode === 'ai' && AI.available) { o._think = true; renderApp(); v = await AI.react(o); o._think = false; byAI = !!v; }
                     else if (S.settings.mode === 'cloud') { o._think = true; renderApp(); v = await AI.cloudReact(o); o._think = false; byAI = !!v; }
@@ -977,12 +982,15 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             let s = 0; mems.forEach(m => { const r = o.reactions[m.id]; if (r === 'in') s += 2; else if (r === 'ok') s += 1; else if (r === 'no') s -= 3; });
             return s;
         }
+        // The single rating shown on a card: AI rating when available, else the match.
+        function ratingOf(o) { const air = aiRating(o); return air ? air.avg : fitScore(o); }
         function rankedOptions() {
-            return [...S.options].map((o, i) => ({ o, i })).sort((a, b) => {
-                if (a.o.won !== b.o.won) return a.o.won ? -1 : 1;
-                const ds = optScore(b.o) - optScore(a.o); if (ds) return ds;
-                return a.o.dist - b.o.dist;
-            }).map(x => x.o);
+            return [...S.options].sort((a, b) => {
+                if (a.won !== b.won) return a.won ? -1 : 1;
+                const ds = optScore(b) - optScore(a); if (ds) return ds;          // 1) group reactions
+                const dr = ratingOf(b) - ratingOf(a); if (Math.abs(dr) > 0.01) return dr; // 2) tie -> rating/grade
+                return a.dist - b.dist;                                            // 3) tie -> closer
+            });
         }
 
         // ---- ratings ----
@@ -1382,7 +1390,13 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             $('set-emoji').textContent = S.me.emoji;
             $('set-emoji-row').style.display = 'none';
             $('set-emoji-row').innerHTML = AVATARS.map(a => `<button class="emoji-pick ${a === S.me.emoji ? 'on' : ''}" data-e="${a}">${a}</button>`).join('');
-            wireModePick($('mode-pick'), () => S.settings.mode, m => { S.settings.mode = m; S.save(); if (m !== 'manual') autoRespondAll(); });
+            wireModePick($('mode-pick'), () => S.settings.mode, m => {
+                const prev = S.settings.mode; S.settings.mode = m; S.save(); renderApp();
+                if (m !== 'manual' && prev !== m) {
+                    if (S.options.length) toast(m === 'ai' || m === 'cloud' ? 'Re-assessing every option with AI…' : 'Re-rating every option from your taste…');
+                    autoRespondAll(true); // re-assess all with the new brain
+                }
+            });
         }
         // name + avatar editing (broadcasts so peers see the change live)
         $('set-name').oninput = e => { S.me.name = e.target.value; };

@@ -196,7 +196,7 @@ A single **consolidated rating** per card (AI score when an AI mode is on, other
 
 Plus a **rendering pass for smoothness**: card updates are now **region-level and flash-free** (reacting on one card — or a friend's reaction arriving — only touches the bits that changed, never rebuilds other cards, and reaction buttons just toggle state rather than re-render), an **"AI thinking…"** indicator with a gentle fade-in for the AI's comment, a **stable card order** while everyone responds (with an opt-in **"Sort by best match"** button — the leader is always badged 🥇 even when it's not at the top), and **equal-height cards per row** on desktop. Card internals are aligned so the consensus bar's position doesn't depend on how long the AI's comment is.
 
-And some session/quality-of-life items: the lock-in shows **who locked it in** (card + celebration), the celebration opens **Google Maps** for directions, the **invite link is stable across refreshes** and you **auto-rejoin your last table** when you reload, and there's a **Saved choices** manager to review, re-rate, or remove your remembered decisions.
+And some session/quality-of-life items: the lock-in shows **who locked it in** (card + celebration), the celebration opens **Google Maps** for directions, the **invite link is stable across refreshes** and you **auto-rejoin your last table** when you reload, and there's a **Saved choices** manager to review, re-rate, or remove your remembered decisions. Ranking breaks ties on the **rating/grade** (so among equally-liked options the better-matched one wins), switching **into an AI mode re-assesses every option** on the table with fresh AI comments, and the free-text "Anything else?" note is labelled **AI-only** (it's read only in an AI mode).
 
 ---
 
