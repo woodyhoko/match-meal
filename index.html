@@ -324,6 +324,20 @@
         #members-list .mr-pi { font-size: .72rem; color: var(--faint); font-family: ui-monospace, monospace; }
         #members-list .mr-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); flex: 0 0 auto; }
         #members-list .mr-dot.off { background: var(--faint); }
+        #saved-list { max-height: 56vh; overflow-y: auto; }
+        #saved-list .srow { display: flex; align-items: center; gap: 8px; padding: 10px 2px; border-bottom: 1px solid var(--line); }
+        #saved-list .srow:last-child { border-bottom: none; }
+        #saved-list .sr-meta { flex: 1; min-width: 0; }
+        #saved-list .sr-n { font-weight: 700; font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #saved-list .sr-r { font-size: .76rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #saved-list .sr-seg { display: flex; gap: 3px; flex: 0 0 auto; }
+        #saved-list .sr-b { width: 32px; height: 32px; border-radius: 9px; background: var(--bg-2); border: 1.5px solid transparent; font-size: 1rem; opacity: .5; transition: .12s; }
+        #saved-list .sr-b.sel { opacity: 1; }
+        #saved-list .sr-b.sel.in { background: var(--green-soft); border-color: var(--green); }
+        #saved-list .sr-b.sel.ok { background: var(--yellow-soft); border-color: var(--yellow); }
+        #saved-list .sr-b.sel.no { background: var(--red-soft); border-color: var(--red); }
+        #saved-list .sr-del { width: 30px; height: 30px; border-radius: 9px; background: var(--bg-2); color: var(--muted); flex: 0 0 auto; font-size: .85rem; }
+        #saved-list .sr-del:hover { color: var(--red); }
         .lead-banner { align-items: center; gap: 12px; padding: 13px 16px; border-radius: 16px; margin-bottom: 14px; background: linear-gradient(120deg, var(--amber-soft), var(--accent-soft)); border: 1px solid var(--line); animation: fadeUp .35s var(--ease) both; }
         .lead-banner.won { background: var(--green-soft); border-color: var(--green); }
         .lead-banner .lb-ico { font-size: 1.7rem; }
@@ -343,10 +357,11 @@
         .ai-note .thinking .dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: blink 1s infinite; }
         .ai-note .thinking .dots i:nth-child(2) { animation-delay: .2s }
         .ai-note .thinking .dots i:nth-child(3) { animation-delay: .4s }
-        /* equal-height cards (especially per row in the desktop grid) */
+        /* equal-height cards (per row in the desktop grid); the consensus bar
+           sits right after the tally so its position doesn't depend on the
+           length of the AI comment, which now lives below the actions. */
         .opt { display: flex; flex-direction: column; }
-        .opt .actions { margin-top: auto; }
-        .opt .actions:empty { display: none; }
+        .opt .ai-note { margin-top: 11px; margin-bottom: 0; }
         .opt-pitch { font-size: .92rem; color: var(--ink-2); line-height: 1.5; margin: 11px 0 0; }
 
         /* reactions tally */
@@ -492,7 +507,7 @@
         <div id="mode-pick"></div>
         <button class="btn ghost block" id="edit-taste" style="margin-top:18px"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Edit my taste</button>
         <button class="btn ghost block" id="who-here" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg> Who's at the table</button>
-        <button class="btn ghost block" id="clear-hist" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Clear my saved choices</button>
+        <button class="btn ghost block" id="saved-prefs" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> Saved choices &amp; history</button>
         <button class="btn soft block" id="leave-table" style="margin-top:10px">Start a fresh table</button>
         <div class="footnote">MatchMeal · © 2026 woodyhoko</div>
     </div>
@@ -504,6 +519,16 @@
         <h3>At the table</h3>
         <p class="sub">Everyone connected right now.</p>
         <div id="members-list"></div>
+    </div>
+
+    <!-- Saved choices sheet -->
+    <div class="sheet" id="sheet-saved">
+        <div class="grab"></div>
+        <button class="sheet-x" aria-label="Close">✕</button>
+        <h3>Saved choices</h3>
+        <p class="sub">Decisions you've made before — reused automatically when the same place comes up again. Tap to change, or remove any.</p>
+        <div id="saved-list"></div>
+        <button class="btn soft block" id="saved-clear" style="margin-top:14px">Clear all saved choices</button>
     </div>
 
     <!-- Taste sheet (edit later) -->
@@ -584,6 +609,7 @@
             loc: null,                 // {lat, lon, label}
             onboarded: false,
             tableHost: null,           // host id we joined (null if I'm host)
+            lastTable: null,           // {id, ts} — auto-rejoined on refresh
             // runtime
             members: new Map(),        // id -> {id,name,emoji,prefs,online}
             options: [],               // {id,name,cuisine,lat,lon,dist,address,by,byName,reactions:{id:'in'|'ok'|'no'},won}
@@ -595,6 +621,9 @@
                     // migrate legacy {ai, autoRespond} -> {mode}
                     if (s && !s.mode) this.settings.mode = (s.autoRespond === false) ? 'manual' : (s.ai ? 'ai' : 'taste');
                     const l = JSON.parse(localStorage.getItem('mm2_loc') || 'null'); if (l) this.loc = l;
+                    const lt = JSON.parse(localStorage.getItem('mm2_lasttable') || 'null');
+                    // only auto-rejoin a recent table (last 12h)
+                    if (lt && (now() - (lt.ts || 0) < 12 * 3600e3)) this.lastTable = lt;
                     this.onboarded = localStorage.getItem('mm2_onb') === '1';
                 } catch (_) {}
                 if (!this.me.name) this.me.name = '';
@@ -603,6 +632,7 @@
                 localStorage.setItem('mm2_me', JSON.stringify(this.me));
                 localStorage.setItem('mm2_set', JSON.stringify(this.settings));
                 if (this.loc) localStorage.setItem('mm2_loc', JSON.stringify(this.loc));
+                if (this.lastTable) localStorage.setItem('mm2_lasttable', JSON.stringify(this.lastTable));
                 localStorage.setItem('mm2_onb', this.onboarded ? '1' : '0');
             },
             myPrefs() { const m = this.me; return { name: m.name, emoji: m.emoji, loves: m.loves, avoids: m.avoids, diet: m.diet, budget: m.budget, radius: m.radius, custom: m.custom || '' }; }
@@ -743,14 +773,16 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             peer: null, conns: new Map(), online: false,
             seenAdd(id) { S.seen.add(id); S.seenOrder.push(id); if (S.seenOrder.length > 800) S.seen.delete(S.seenOrder.shift()); },
             start() {
-                const myId = 'tbl-' + uid(6);
+                // Reuse a stable id across refreshes so the invite link stays valid
+                // and friends can auto-rejoin the same table.
+                const myId = localStorage.getItem('mm2_peerid') || ('tbl-' + uid(6));
                 return new Promise(res => {
                     this.peer = new Peer(myId, { debug: 1 });
-                    this.peer.on('open', id => { S.me.id = id; this.online = true; res(id); });
+                    this.peer.on('open', id => { S.me.id = id; this.online = true; localStorage.setItem('mm2_peerid', id); res(id); });
                     this.peer.on('connection', c => this.wire(c, true));
                     this.peer.on('error', e => {
                         console.warn('peer err', e.type);
-                        if (e.type === 'unavailable-id') { this.peer.destroy(); this.start().then(res); }
+                        if (e.type === 'unavailable-id') { localStorage.removeItem('mm2_peerid'); this.peer.destroy(); this.start().then(res); } // id taken (another tab) — get a fresh one
                         else if (e.type === 'peer-unavailable') toast('That table is offline or the link is old.', 'bad');
                         else if (!S.me.id) { S.me.id = myId; res(myId); toast('Signalling unreachable — running solo.', 'bad'); }
                     });
@@ -791,7 +823,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             }
         };
         function env(type, payload, ttl = 5) { return { id: rid(), type, from: S.me.id, fromName: S.me.name, fromEmoji: S.me.emoji, ttl, ts: now(), payload }; }
-        function serOpt(o) { return { id: o.id, name: o.name, cuisine: o.cuisine, lat: o.lat, lon: o.lon, dist: o.dist, address: o.address, by: o.by, byName: o.byName, pitch: o.pitch, reactions: o.reactions, notes: o.notes || {}, won: o.won }; }
+        function serOpt(o) { return { id: o.id, name: o.name, cuisine: o.cuisine, lat: o.lat, lon: o.lon, dist: o.dist, address: o.address, by: o.by, byName: o.byName, pitch: o.pitch, reactions: o.reactions, notes: o.notes || {}, won: o.won, wonBy: o.wonBy }; }
         function findOpt(id) { return S.options.find(o => o.id === id); }
 
         function handle(e) {
@@ -813,7 +845,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             }
             if (e.type === 'FINALIZE') {
                 const o = findOpt(p.optionId); if (!o || o.won) return;
-                o.won = true; S.options.forEach(x => { if (x.id !== o.id) x.won = false; }); renderApp(); showCelebration(o); return;
+                o.won = true; o.wonBy = p.byName || e.fromName || 'someone'; S.options.forEach(x => { if (x.id !== o.id) x.won = false; }); renderApp(); showCelebration(o); return;
             }
         }
 
@@ -915,7 +947,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             o.notes[S.me.id] = note;
             // Remember my decision for this restaurant so it carries across tables.
             S.me.history = S.me.history || {};
-            S.me.history[o.name.toLowerCase()] = { r, score: note.score || null, reason: note.reason || '', by: note.by, ts: now() };
+            S.me.history[o.name.toLowerCase()] = { name: o.name, r, score: note.score || null, reason: note.reason || '', by: note.by, ts: now() };
             capHistory(); S.save();
             Mesh.emit('REACT', { optionId: o.id, r, score: note.score, reason: note.reason });
             renderApp();
@@ -927,8 +959,8 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             if (o.won) return;
             const c = consensusState(o);
             if (!c.all) { toast('Everyone needs to be in first.', 'bad'); return; }
-            o.won = true; S.options.forEach(x => { if (x.id !== o.id) x.won = false; });
-            Mesh.emit('FINALIZE', { optionId: o.id });
+            o.won = true; o.wonBy = S.me.name; S.options.forEach(x => { if (x.id !== o.id) x.won = false; });
+            Mesh.emit('FINALIZE', { optionId: o.id, byName: S.me.name });
             renderApp(); showCelebration(o);
         }
 
@@ -1113,19 +1145,19 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             $('table-sub').textContent = S.tableHost ? 'joined a table' : (np ? 'you host' : 'tap share to invite');
             // members + share
             renderMembers();
-            // location
-            $('locbar').innerHTML = S.loc
+            // location (guarded so it never re-renders/flashes when unchanged)
+            setRegion($('locbar'), S.loc
                 ? `<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> <b>${esc(S.loc.label)}</b> <span class="chg">change</span>`
-                : `<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> <span style="color:var(--muted)">Set your location to search</span> <span class="chg">set</span>`;
+                : `<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> <span style="color:var(--muted)">Set your location to search</span> <span class="chg">set</span>`);
             // find button
             $('find-btn').disabled = searching || !S.loc;
-            $('find-btn').innerHTML = searching
+            setRegion($('find-btn'), searching
                 ? `<svg class="ic" viewBox="0 0 24 24" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.2-8.5"/></svg> Finding great spots…`
-                : `<svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg> ${!S.loc ? 'Set your location first' : (S.options.length ? 'Show 6 more options' : 'Find places nearby')}`;
+                : `<svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg> ${!S.loc ? 'Set your location first' : (S.options.length ? 'Show 6 more options' : 'Find places nearby')}`);
             $('find-hint').textContent = searching ? '' : (lastSearchMsg || (!S.loc ? '' : (np ? "ranked by everyone's taste at the table" : 'invite friends first, or find a place solo')));
             // response-mode chip (this is where you can tell whether AI is in use)
             const mm = modeMeta();
-            $('mode-chip').innerHTML = `<span class="mc-ico">${mm.i}</span><span>You react: <b class="mc-k">${mm.k}</b></span><span class="mc-go">Change ›</span>`;
+            setRegion($('mode-chip'), `<span class="mc-ico">${mm.i}</span><span>You react: <b class="mc-k">${mm.k}</b></span><span class="mc-go">Change ›</span>`);
             // board + match summary
             renderBoard();
             updateLead();
@@ -1135,21 +1167,20 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             const b = $('lead-banner'); if (!b) return;
             const ranked = rankedOptions();
             const won = ranked.find(o => o.won);
-            if (won) { b.style.display = 'flex'; b.className = 'lead-banner won'; b.innerHTML = `<span class="lb-ico">🏆</span><div class="lb-x"><div class="lb-t">Matched: ${esc(won.name)}</div><div class="lb-s">everyone's in — enjoy!</div></div>`; return; }
+            if (won) { b.style.display = 'flex'; b.className = 'lead-banner won'; setRegion(b, `<span class="lb-ico">🏆</span><div class="lb-x"><div class="lb-t">Matched: ${esc(won.name)}</div><div class="lb-s">${esc(won.wonBy ? (won.wonBy === S.me.name ? 'You' : won.wonBy) + ' locked it in' : "everyone's in")} — enjoy!</div></div>`); return; }
             const top = ranked[0];
             if (!top || liveMembers().length < 2) { b.style.display = 'none'; return; }
             const c = consensusState(top);
             b.style.display = 'flex'; b.className = 'lead-banner';
-            b.innerHTML = `<span class="lb-ico">🥇</span><div class="lb-x"><div class="lb-t">Leading: ${esc(top.name)}</div><div class="lb-s"><b>${c.ins}/${c.total}</b> in${c.nos ? ` · ${c.nos} not keen` : ''}${c.all ? ' · ready to lock!' : ''}</div></div>`;
+            setRegion(b, `<span class="lb-ico">🥇</span><div class="lb-x"><div class="lb-t">Leading: ${esc(top.name)}</div><div class="lb-s"><b>${c.ins}/${c.total}</b> in${c.nos ? ` · ${c.nos} not keen` : ''}${c.all ? ' · ready to lock!' : ''}</div></div>`);
         }
 
         function renderMembers() {
             const m = $('members'); const mem = liveMembers();
             const stack = mem.slice(0, 6).map(x => `<div class="ava ${x.me ? 'me' : ''}" title="${esc(x.name)}">${esc(x.emoji)}<span class="dot ${x.online ? '' : 'off'}"></span></div>`).join('');
-            m.innerHTML = `<button class="who-btn" id="who-btn" title="See who's at the table"><div class="ava-stack">${stack}</div><span class="mcount">${mem.length === 1 ? 'just you' : mem.length + ' at the table'}</span></button>
+            const html = `<button class="who-btn" id="who-btn" title="See who's at the table"><div class="ava-stack">${stack}</div><span class="mcount">${mem.length === 1 ? 'just you' : mem.length + ' at the table'}</span></button>
                 <button class="btn soft share-mini" id="share-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5 8.6 10.5"/></svg> Invite</button>`;
-            $('share-btn').onclick = openShare;
-            $('who-btn').onclick = openMembers;
+            if (setRegion(m, html)) { $('share-btn').onclick = openShare; $('who-btn').onclick = openMembers; }
         }
 
         // ---- board: stable order by default; only sort on demand ----
@@ -1225,11 +1256,18 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
                 </div>
                 <div class="opt-rate"></div>
                 ${o.pitch ? `<div class="opt-pitch">${esc(o.pitch)}</div>` : ''}
-                <div class="ai-note" hidden></div>
                 <div class="tally"></div>
                 <div class="consensus" hidden></div>
-                <div class="objections"></div>
-                <div class="actions"></div>`;
+                <div class="actions">
+                    <div class="react">
+                        <button class="rb in" data-r="in"><span class="e">😋</span>I'm in</button>
+                        <button class="rb ok" data-r="ok"><span class="e">🤔</span>Meh</button>
+                        <button class="rb no" data-r="no"><span class="e">🙅</span>Nope</button>
+                    </div>
+                    <div class="lockwrap"></div>
+                </div>
+                <div class="ai-note" hidden></div>
+                <div class="objections"></div>`;
         }
         // Update a region ONLY when its content changed — no whole-card rebuild, no flash.
         function setRegion(elm, html) { if (elm && elm.dataset.h !== html) { elm.dataset.h = html; elm.innerHTML = html; return true; } return false; }
@@ -1266,15 +1304,17 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             // objections
             const objs = mem.filter(m => (o.reactions[m.id] === 'no' || o.reactions[m.id] === 'ok') && notes[m.id] && notes[m.id].reason);
             setRegion(card.querySelector('.objections'), o.won ? '' : objs.map(m => `<div class="obj"><span class="oe">${esc(m.emoji)}</span> ${o.reactions[m.id] === 'no' ? '🙅' : '🤔'} <b>${esc(m.me ? 'You' : m.name)}</b>: <span class="or">${esc(notes[m.id].reason)}</span></div>`).join(''));
-            // actions
+            // actions — toggle button classes instead of rebuilding, so pressing
+            // a reaction never re-creates the buttons (no flash).
             const my = o.reactions[S.me.id];
-            setRegion(card.querySelector('.actions'), o.won
-                ? `<div class="won-foot"><span class="big">🎉</span><span>It's settled — enjoy!</span><a class="go" href="${gdir}" target="_blank" rel="noopener">Directions</a></div>`
-                : `<div class="react">
-                        <button class="rb in ${my === 'in' ? 'sel' : ''}" data-r="in"><span class="e">😋</span>I'm in</button>
-                        <button class="rb ok ${my === 'ok' ? 'sel' : ''}" data-r="ok"><span class="e">🤔</span>Meh</button>
-                        <button class="rb no ${my === 'no' ? 'sel' : ''}" data-r="no"><span class="e">🙅</span>Nope</button>
-                    </div>${c.all ? `<button class="btn block lock-btn" data-lock="1" style="margin-top:11px;background:var(--green);box-shadow:0 10px 24px rgba(22,184,102,.32)"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> ${c.total > 1 ? "Everyone's in — lock it in" : 'Lock this in'}</button>` : ''}`);
+            const actions = card.querySelector('.actions');
+            if (o.won) {
+                setRegion(actions, `<div class="won-foot"><span class="big">🎉</span><span>Locked in${o.wonBy ? ' by ' + esc(o.wonBy === S.me.name ? 'you' : o.wonBy) : ''} — enjoy!</span><a class="go" href="${gdir}" target="_blank" rel="noopener">Directions</a></div>`);
+            } else {
+                const react = card.querySelector('.react');
+                if (react) react.querySelectorAll('.rb').forEach(b => b.classList.toggle('sel', b.dataset.r === my));
+                setRegion(card.querySelector('.lockwrap'), c.all ? `<button class="btn block lock-btn" data-lock="1" style="margin-top:11px;background:var(--green);box-shadow:0 10px 24px rgba(22,184,102,.32)"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> ${c.total > 1 ? "Everyone's in — lock it in" : 'Lock this in'}</button>` : '');
+            }
         }
         // Delegated handlers, set once on create — survive region re-renders.
         function wireCard(card) {
@@ -1350,7 +1390,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
         $('set-emoji').onclick = () => { const row = $('set-emoji-row'); row.style.display = row.style.display === 'none' ? 'flex' : 'none'; };
         $('set-emoji-row').onclick = e => { const b = e.target.closest('[data-e]'); if (!b) return; S.me.emoji = b.dataset.e; $('set-emoji').textContent = S.me.emoji; $('set-emoji-row').querySelectorAll('.emoji-pick').forEach(x => x.classList.toggle('on', x === b)); $('set-emoji-row').style.display = 'none'; S.save(); broadcastPrefs(); renderApp(); haptic(); };
         $('who-here').onclick = () => { closeSheets(); openMembers(); };
-        $('clear-hist').onclick = () => { if (confirm('Clear your saved choices and remembered restaurant decisions on this device?')) { S.me.history = {}; S.save(); toast('Saved choices cleared.', 'good'); } };
+        $('saved-prefs').onclick = () => { closeSheets(); openSaved(); };
         $('leave-table').onclick = () => { if (confirm('Start a brand-new empty table? Current options will clear for you.')) { S.options = []; cardEls.clear(); $('board').innerHTML = ''; renderApp(); closeSheets(); } };
         $('edit-taste').onclick = () => { closeSheets(); openTaste(); };
 
@@ -1360,6 +1400,30 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             $('members-list').innerHTML = mem.map(m => `<div class="mrow"><span class="mr-ava">${esc(m.emoji)}</span><div class="mr-meta"><div class="mr-n">${esc(m.name)}${m.me ? ' <span class="mr-you">you</span>' : ''}</div><div class="mr-pi">${esc(m.id || '…')}</div></div><span class="mr-dot ${m.online ? '' : 'off'}"></span></div>`).join('') + (mem.length === 1 ? '<p class="sub" style="margin-top:14px">Just you so far — tap <b>Invite</b> to bring friends in.</p>' : '');
             openSheet('sheet-members');
         }
+
+        // saved choices / history — view, adjust, remove
+        function openSaved() { renderSaved(); openSheet('sheet-saved'); }
+        function renderSaved() {
+            const h = S.me.history || {};
+            const items = Object.entries(h).map(([k, v]) => ({ k, ...v })).sort((a, b) => (b.ts || 0) - (a.ts || 0));
+            const list = $('saved-list');
+            if (!items.length) { list.innerHTML = '<p class="sub">No saved choices yet. As you (or your AI) react to places, your decisions are remembered here.</p>'; return; }
+            list.innerHTML = items.map(it => `<div class="srow">
+                <div class="sr-meta"><div class="sr-n">${esc(it.name || it.k)}</div>${it.reason ? `<div class="sr-r">${esc(it.reason)}</div>` : ''}</div>
+                <div class="sr-seg">
+                    <button class="sr-b ${it.r === 'in' ? 'sel in' : ''}" data-k="${esc(it.k)}" data-r="in" title="happy to go">😋</button>
+                    <button class="sr-b ${it.r === 'ok' ? 'sel ok' : ''}" data-k="${esc(it.k)}" data-r="ok" title="meh">🤔</button>
+                    <button class="sr-b ${it.r === 'no' ? 'sel no' : ''}" data-k="${esc(it.k)}" data-r="no" title="no">🙅</button>
+                </div>
+                <button class="sr-del" data-del="${esc(it.k)}" title="Forget this">✕</button>
+            </div>`).join('');
+        }
+        $('saved-list').onclick = e => {
+            const rb = e.target.closest('[data-r]'), del = e.target.closest('[data-del]');
+            if (rb) { const it = S.me.history[rb.dataset.k]; if (it) { it.r = rb.dataset.r; it.by = 'you'; it.ts = now(); S.save(); renderSaved(); haptic(); } }
+            else if (del) { delete S.me.history[del.dataset.del]; S.save(); renderSaved(); haptic(); }
+        };
+        $('saved-clear').onclick = () => { if (confirm('Clear all saved choices on this device?')) { S.me.history = {}; S.save(); renderSaved(); toast('Saved choices cleared.', 'good'); } };
 
         // taste editor sheet
         function openTaste() {
@@ -1395,8 +1459,10 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
         function showCelebration(o) {
             $('cele-name').textContent = o.name;
             const c = consensusState(o);
-            $('cele-sub').textContent = c.total > 1 ? `All ${c.total} of you are in. Time to eat!` : 'Locked in. Time to eat!';
-            $('cele-go').onclick = () => window.open(`https://www.openstreetmap.org/?mlat=${o.lat}&mlon=${o.lon}#map=18/${o.lat}/${o.lon}`, '_blank');
+            const who = o.wonBy ? `${esc(o.wonBy === S.me.name ? 'You' : o.wonBy)} locked it in. ` : '';
+            $('cele-sub').innerHTML = who + (c.total > 1 ? `All ${c.total} of you are in — time to eat!` : 'Time to eat!');
+            // Open in Google Maps (directions to the spot).
+            $('cele-go').onclick = () => window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(o.lat + ',' + o.lon)}`, '_blank');
             $('celebrate').classList.add('show');
             confetti(); haptic(40);
         }
@@ -1419,12 +1485,26 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
         async function boot() {
             // bring my node online
             try { await Mesh.start(); } catch (e) { console.error(e); }
-            // auto-join a table from the link
-            const t = new URLSearchParams(location.search).get('t');
-            if (t && t !== S.me.id) { S.tableHost = t; setTimeout(() => Mesh.connect(t), 600); }
+            // join a table from the link, or auto-rejoin the last table on refresh
+            const t = new URLSearchParams(location.search).get('t') || (S.lastTable && S.lastTable.id);
+            const fromLink = !!new URLSearchParams(location.search).get('t');
+            if (t && t !== S.me.id) {
+                S.tableHost = t; recordTable(t);
+                setTimeout(() => Mesh.connect(t), 600);
+                if (!fromLink) toast('Rejoining your last table…');
+            }
             render();
-            // share prompt for fresh hosts
+            // share prompt for fresh hosts only
             if (!t) setTimeout(() => { if (!Mesh.conns.size) openShare(); }, 700);
+        }
+        // Remember tables I join so I can auto-rejoin and review them later.
+        function recordTable(id) {
+            S.lastTable = { id, ts: now() };
+            S.me.tableHistory = S.me.tableHistory || [];
+            const ex = S.me.tableHistory.find(x => x.id === id);
+            if (ex) ex.ts = now(); else S.me.tableHistory.unshift({ id, ts: now() });
+            if (S.me.tableHistory.length > 20) S.me.tableHistory.length = 20;
+            S.save();
         }
 
         async function init() {

@@ -194,7 +194,9 @@ MatchMeal is free and viral by design; the realistic strategy keeps the share lo
 
 A single **consolidated rating** per card (AI score when an AI mode is on, otherwise the deterministic table-match), a **match board** banner showing the current front-runner, **visible rejection reasons** (who turned a place down and why), a **custom free-text preference**, **per-restaurant decision history** that auto-applies when you rejoin a table and see the same place, **name/avatar editing**, a **"who's at the table"** view, and **clear-history**.
 
-Plus a **rendering pass for smoothness**: card updates are now **region-level and flash-free** (reacting on one card — or a friend's reaction arriving — only touches the bits that changed, never rebuilds other cards), an **"AI thinking…"** indicator with a gentle fade-in for the AI's comment, a **stable card order** while everyone responds (with an opt-in **"Sort by best match"** button — the leader is always badged 🥇 even when it's not at the top), and **equal-height cards per row** on desktop.
+Plus a **rendering pass for smoothness**: card updates are now **region-level and flash-free** (reacting on one card — or a friend's reaction arriving — only touches the bits that changed, never rebuilds other cards, and reaction buttons just toggle state rather than re-render), an **"AI thinking…"** indicator with a gentle fade-in for the AI's comment, a **stable card order** while everyone responds (with an opt-in **"Sort by best match"** button — the leader is always badged 🥇 even when it's not at the top), and **equal-height cards per row** on desktop. Card internals are aligned so the consensus bar's position doesn't depend on how long the AI's comment is.
+
+And some session/quality-of-life items: the lock-in shows **who locked it in** (card + celebration), the celebration opens **Google Maps** for directions, the **invite link is stable across refreshes** and you **auto-rejoin your last table** when you reload, and there's a **Saved choices** manager to review, re-rate, or remove your remembered decisions.
 
 ---
 
