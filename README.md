@@ -1,125 +1,201 @@
-# MatchMeal
+# 🍽️ MatchMeal
 
-**A peer-to-peer "where shall we eat?" negotiator — your tastes stay on your device, your AI does the haggling.**
+**Decide where to eat, together.** Share one link, everyone adds their taste on their own device, and MatchMeal finds the restaurant the whole table is happy with — then locks it in when everyone agrees.
 
-MatchMeal connects a small group of friends over a direct browser-to-browser link and helps them agree on one restaurant everyone is happy with. Each person keeps their own dining preferences entirely on their own device, where a private on-device AI "concierge" searches the real world for nearby places, proposes options, and — on its owner's behalf — answers everyone else's agents about whether a suggestion works. The organiser keeps proposing until every agent at the table is satisfied, then locks in the pick. Nothing about your tastes ever leaves your machine; only the verdicts your agent chooses to share are sent over the wire.
+It's a **single static web app**: no backend, no accounts, no install, no tracking. Built by [woodyhoko](https://github.com/woodyhoko).
 
-It is a single `index.html` file: no build step, no backend, no framework, no accounts.
+- **Live:** https://space.hoko.xyz/match-meal/
+- **Classic version:** https://space.hoko.xyz/match-meal/classic.html
 
-## Features
+---
 
-- **Direct peer-to-peer connection.** Friends join over a real WebRTC data channel via an invite link; three or more people automatically form a full mesh.
-- **A private taste profile that lives on your device.** Cuisines marked love/avoid, dietary needs, a max budget, a max distance and free-text notes — all cached locally so you never re-enter them.
-- **A personal AI concierge.** An on-device model plans the search, picks the best restaurant, writes a short pitch, and represents you in the negotiation — all without any of your data leaving the browser.
-- **Real OpenStreetMap restaurant search from your location.** Keyless, CORS-enabled queries find genuine nearby places using your geolocation, with distances computed locally.
-- **Agents that negotiate on each owner's behalf.** Every participant's agent judges a proposal against *its own* owner's private preferences and replies satisfied / concern / veto, with a reason.
-- **Learning from a rejection.** When you turn an option down, the app offers to remember it as a rule — never suggest that place again, allow it only under a condition, or avoid that cuisine entirely.
-- **Everything is cached.** Profile, rules, location and the (large, one-time) model weights are all persisted, so repeat visits are instant and offline-friendly.
-- **One-click import / export.** Save your preferences to a portable `*.matchmeal.json` file and load them back by file picker or paste.
-- **Responsive UI for desktop and mobile.** A warm, food-themed glassmorphism design that flows from a three-column desktop layout to a single mobile column.
+## Table of contents
 
-## How it works (the approach)
+- [Two versions](#two-versions)
+- [What it does](#what-it-does)
+- [The four response modes](#the-four-response-modes-how-you-react)
+- [How it works (architecture)](#how-it-works-architecture)
+- [Restaurant data, ratings & reviews](#restaurant-data-ratings--reviews)
+- [Privacy](#privacy)
+- [Run it locally](#run-it-locally)
+- [Deploy to GitHub Pages](#deploy-to-github-pages)
+- [Project layout](#project-layout)
+- [Tech stack](#tech-stack)
+- [Monetization directions (notes)](#monetization-directions-notes)
+- [Roadmap / not yet built](#roadmap--not-yet-built)
+- [License](#license)
+
+---
+
+## Two versions
+
+| | **New design — `index.html`** (default) | **Classic — `classic.html`** |
+|---|---|---|
+| Feel | Minimalist, mobile-first, share-first | Three-column "control room" dashboard |
+| AI | Optional: on-device **or** cloud **or** none | On-device only (Chrome Prompt API → Gemma) |
+| Group model | Everyone reacts; ranked by the group; all-party lock-in | Organiser proposes; agents reply on each owner's behalf |
+| Best for | Phones, quick decisions, going viral | Power users, the original concierge experience |
+
+The two are cross-linked (a "classic version" link in the new app; a "✨ New design" link in the classic one) and both ship from the same repo, so a single `git push` redeploys both.
+
+The rest of this README focuses on the **new design** unless noted.
+
+---
+
+## What it does
+
+- **Connect peer-to-peer.** One person taps **Invite** to share a link (or QR code, or the native share sheet). Whoever opens it joins instantly over a direct **WebRTC** data channel — no app, no sign-up. Three or more people automatically form a full mesh.
+- **A private taste profile.** Each person taps the cuisines they **love** / **avoid**, picks dietary needs, a budget and a max distance. It's cached on their own device and shared with the table so the search fits *everyone*.
+- **Find real places.** Using your location, the app searches actual nearby restaurants (OpenStreetMap) and proposes a batch, ranked by the **whole table's** combined taste.
+- **Everyone reacts.** Each option gets a 😋 / 🤔 / 🙅 from every member — automatically (from taste or AI) or by tapping. Options are **ranked by the group's reactions**, best on top, with a smooth re-order animation.
+- **Lock it in, together.** A place can only be locked in once **every member is in** — it's a true all-party decision, not one person forcing it. When that happens: confetti 🎉 and one-tap directions.
+- **Nobody gets left "waiting."** New joiners receive a full sync of the current options *and* everyone's existing reactions, and immediately respond, so the board is never stuck.
+- **Caches everything.** Your profile, settings and location persist between visits — nothing to re-enter.
+- **Beautiful on phone and desktop.** Mobile is a single-column app with bottom sheets; desktop is a roomier two-column layout with a sticky control rail, a 2-up option grid, and centered modal dialogs.
+
+---
+
+## The four response modes (how you react)
+
+This is the part that's easy to miss, so it's worth stating plainly. Each person chooses **one** mode (during onboarding, changeable anytime in **Settings**). It controls **how your reactions to options happen** — it does **not** affect the restaurant search itself (the search is always location + everyone's taste, no AI).
+
+| Mode | What happens | Needs | Privacy |
+|---|---|---|---|
+| 👆 **I'll tap myself** | Nothing is automatic — you tap 😋/🤔/🙅 on each option. | nothing | fully private |
+| ⚡ **Auto from my taste** | The app reacts instantly using your preferences (loved/avoided cuisines, distance). | nothing | fully private |
+| 🧠 **Auto with on-device AI** | A language model **on your device** reads each option and reacts with nuance. | Chrome/Edge with built-in AI | fully private (stays on device) |
+| ☁️ **Auto with cloud AI** | A free online model reacts for you — works on any phone. | internet | sends your picks to the online service |
+
+Notes:
+- **On-device AI** uses Chrome's built-in Prompt API (`window.LanguageModel`) — zero download, nothing leaves the device. It's shown disabled with a "needs Chrome AI" note where unavailable.
+- **Cloud AI** lazy-loads a keyless provider ([Puter.js](https://developer.puter.com/)) only when you choose it, so the default experience stays dependency-free. It's hardened with timeouts that fall back to the deterministic taste reaction, so it never hangs.
+- Every AI call has a deterministic fallback, so the app stays fully usable even when no model is available.
+
+---
+
+## How it works (architecture)
 
 ### Peer-to-peer transport
+MatchMeal uses **PeerJS** purely as a tiny cloud signalling broker — it carries only the WebRTC handshake. Once two browsers connect, they talk directly over an `RTCDataChannel`; the broker is out of the loop.
 
-MatchMeal uses **PeerJS** purely as a tiny cloud signalling broker — it carries only the WebRTC SDP/ICE handshake. The moment two browsers have exchanged that handshake, they talk directly to each other over an `RTCDataChannel`; the broker is no longer in the conversation.
+- **Host vs guest.** The person who shares the link stays reachable under a short id (`tbl-XXXXXX`); friends join via `?t=<id>` (the invite link), which auto-connects on load.
+- **Gossip into a full mesh.** A new peer announces itself and its known peers; everyone dials anyone they're missing, so 3+ people converge into a full mesh.
+- **Flood + de-dup.** Messages are JSON envelopes flooded with a TTL and de-duplicated by id, so they reach the whole mesh even across indirect links.
+- **Message types:** `HELLO` (introduce + share prefs + gossip peers), `SYNC` (full board state to a newcomer), `PROPOSE` (put options on the table), `REACT` (a reaction), `FINALIZE` (lock in the agreed place).
 
-- **Host vs guest.** Anyone who keeps "Stay reachable so others can join me (host)" enabled stays registered on the broker under a short id (e.g. `meal-AB12CD`) and is auto-reconnected if the broker connection drops. Friends dial in either by pasting that id or by opening an invite link of the form `…/?join=<id>`, which auto-connects on load.
-- **Gossip into a full mesh.** When a peer connects it sends a `HELLO` carrying its name, emoji and *its own list of known peers*. Each side then dials any peers it doesn't already have, so a group of three or more converges into a full mesh where everyone is directly connected (connections learned this way are marked "relayed" in the UI).
-- **Flood with TTL + de-dup.** Every message is a JSON **envelope** — `{ v, id, type, from, fromName, fromEmoji, ttl, ts, payload }`. Non-`HELLO` events are handled locally and then re-broadcast to every other connection with `ttl - 1`, so messages reach the whole mesh even across indirect links. A bounded `seen` set keyed by envelope `id` discards duplicates, so flooding never loops.
-- **Message types:** `HELLO` (introduce self + peer list), `PROPOSE` (put a restaurant on the table), `VERDICT` (an agent's stance on a proposal), `ASK` (ask the table a question), `ANSWER` (an agent's reply on its owner's behalf), `FINALIZE` (lock in the agreed place) and `CHAT` (a plain human message to everyone).
+### Considering the whole table
+Whoever searches aggregates **everyone's** shared preferences: loved cuisines (weighted by how many want them), avoided cuisines and diets (hard-excluded), the **minimum** of everyone's max distances (so all can reach), and budget. Real candidates come from OpenStreetMap; they're scored against that aggregate plus distance, and the top ~6 are proposed.
 
-### On-device intelligence
+### Group ranking & all-party consensus
+Each member's reaction (`in` / `ok` / `no`) is a vote. Options are sorted by the **group score** (`in` = +2, `ok` = +1, `no` = −3), best first. A place becomes lockable **only when every live member is `in`** — then any member can seal it, and everyone sees the celebration. That's the "decided by all parties" rule.
 
-Each user runs their **own** language model locally — there is no shared server model.
+### On-device intelligence (optional)
+See [the four modes](#the-four-response-modes-how-you-react). The "AI" in this app is used **only to react to options on your behalf** — searching and ranking are deterministic and need no AI. Reasoning steps request a strict JSON shape (used like a function call) and are parsed with a brace-balanced extractor that survives chatty models.
 
-- **Chrome built-in Prompt API preferred.** If `window.LanguageModel` is available, the concierge reasons through it with zero download.
-- **On-device Gemma fallback.** Otherwise it falls back to Google **Gemma** (`gemma-4-E2B-it`) running locally via **MediaPipe LiteRT / WebGPU**. The MediaPipe GenAI runtime is **dynamically imported only when Gemma is actually needed**, so Prompt API users never fetch it and the page itself loads instantly.
-- **Weights cached in OPFS.** The first Gemma run is a one-time (~2 GB) download streamed with a progress bar and cached in the browser's Origin Private File System (with a stored size sentinel for validation), so subsequent visits skip the download entirely.
-- **Schema-constrained JSON as "function-calling."** The concierge's reasoning steps (plan a search, pick the best candidate, cast a verdict, answer the table) each request a strict JSON shape — used like function calls — and the response is parsed with a balanced-brace extractor that survives chatty models.
-- **Deterministic fallbacks everywhere.** Every AI call (`AI.json`) ships with a hand-written fallback result, so if no model is present, the model errors, or the JSON is malformed, the app still produces a sensible answer and stays fully usable. Hard preference rules (never-suggest a place, avoid a cuisine) are also enforced *deterministically before the model is ever consulted*, so private vetoes never depend on the LLM.
-- **Privacy.** Your raw tastes, rules and notes are only ever fed to your own local model. The only things that travel over the data channel are the verdicts and answers your agent chooses to share.
+---
 
-### The negotiation protocol
+## Restaurant data, ratings & reviews
 
-1. **Propose.** Your concierge calls the search tool, filters and scores the results against your loves/avoids and rules, picks one, writes a one-sentence pitch, and broadcasts a `PROPOSE`.
-2. **Verdict.** On receiving a proposal, *each* participant's agent evaluates it against its **own** owner's private profile and replies with a `VERDICT` of **satisfied**, **concern** or **veto**, plus a short first-person reason. The proposer's own agent records an honest verdict too.
-3. **Finalise.** The card shows every participant's stance (with reasons on hover). When everyone is satisfied and no one has vetoed, the proposer can `FINALIZE` — and any participant can manually override their own agent's stance, because the human always has the final say.
-4. **Ask the table.** The organiser can poll everyone's mood with an `ASK`; each agent answers (`ANSWER`) what its owner is in the mood for, and those moods feed the next search plan.
-5. **Remember a rejection.** When you mark a proposal as a concern or veto, MatchMeal offers to store that dissatisfaction as a reusable rule — never again, only-under-a-condition, or avoid that cuisine.
+- **Places** come from the **OpenStreetMap Overpass API** (keyless, with mirror fallbacks). Distances are computed locally with the haversine formula. **Nominatim** handles typing in a location by name.
+- **Ratings, reviews & photos:** every option links straight to its **Google Maps** page (the "★ reviews & photos" link), and the locked-in place's **Directions** open in Google Maps. This gives you Google's real ratings, reviews and photos in one tap, for free, with no API key.
+- **Why not embedded in the cards?** Showing Google's ratings/reviews/photos *inline* requires the paid **Google Places API** with a billable key — unsafe to embed in a public static page, and restricted by Google's terms. OpenStreetMap rarely carries ratings or photos, so Google (via the link) is the right source for those. Embedding them is on the [roadmap](#roadmap--not-yet-built) as an optional, key-required feature.
 
-**One round at a glance:**
+---
 
-```
-your concierge
-   │  search_restaurants(near, cuisines, radius)   ← OpenStreetMap Overpass
-   │  pick best + write pitch
-   ▼
- PROPOSE ──flood──▶ every peer
-                      │  each agent evaluates vs. its OWN owner's profile
-                      ▼
-                   VERDICT (satisfied / concern / veto + reason) ──flood──▶ all
-   ┌───────────────────────────────────────────────┐
-   │ all verdicts in & nobody vetoed?               │
-   └───────────────────────────────────────────────┘
-                      │ yes
-                      ▼
-                  FINALIZE ──flood──▶ "🎉 it's settled"
-```
+## Privacy
 
-### Real-world data
+- Your raw tastes, rules and location are only ever fed to **your own** device (and to your own local model in on-device AI mode). They are stored in `localStorage`, not on any server.
+- The **only** things sent over the WebRTC channel are the reactions and answers you choose to share — never your full profile's private internals.
+- The one exception is **Cloud AI mode**, which (by your explicit choice) sends the option + your taste to the online provider to get a reaction. It's clearly labelled and entirely opt-in.
+- Because it's a purely client-side app served as static files, anyone can View-Source it — the code is protected by the [LICENSE](#license), not by secrecy.
 
-The "tool" the concierge calls is real-world search, all keyless and CORS-friendly:
-
-- **OpenStreetMap Overpass API** finds real nearby restaurants, cafés and fast-food places within your chosen radius from your geolocation. Multiple mirror endpoints are tried in turn for resilience, and dietary tags (vegetarian / vegan / halal) are read straight from OSM data.
-- **OpenStreetMap Nominatim** handles forward geocoding (look up a place name you type) and reverse geocoding (turn your coordinates into a neighbourhood label).
-- **Haversine formula** computes the great-circle distance to each candidate locally, used for both display and ranking.
+---
 
 ## Run it locally
 
-MatchMeal **must be served over http(s)** — geolocation, WebGPU and OPFS are all blocked on `file://`, so opening `index.html` directly will not work for the AI or location features.
-
-From the project folder:
+Serve over `http(s)` — geolocation, WebGPU and OPFS are blocked on `file://`, so opening the file directly won't work for location or AI.
 
 ```bash
 python -m http.server 8000
 ```
 
-Then open **http://localhost:8000** in **Chrome or Edge**.
+Then open **http://localhost:8000** in **Chrome or Edge**. (Connecting, profiles and the deterministic "taste" mode work in any modern browser; on-device AI needs Chromium with the built-in Prompt API.)
 
-> The AI features need a Chromium-based browser: either one with the built-in Prompt API, or one that supports WebGPU for the one-time on-device Gemma download (~2 GB, cached afterward). Other browsers can still connect, set a profile and chat, but the concierge reasoning needs a supported browser.
+---
 
 ## Deploy to GitHub Pages
 
-Because the app is a single static file with no backend, GitHub Pages hosts it perfectly. These steps assume the GitHub user **woodyhoko** and a repo named **match-meal**, served from the root of the `main` branch.
+The repo is already wired for this. Any push to `main` runs `.github/workflows/pages.yml`, which **auto-enables and deploys** Pages — no Settings clicks needed. The site is served at `https://woodyhoko.github.io/match-meal/` and (via custom domain) `https://space.hoko.xyz/match-meal/`.
 
-1. **Create the repository** `match-meal` under your account at https://github.com/new. A **public** repo is the simplest setup and is assumed below.
-2. **Push the code:**
+To set it up from scratch on another account:
+
+1. Create a **public** repo (Pages on a free plan needs public).
+2. Push the files:
    ```bash
    git init
-   git add index.html LICENSE README.md
-   git commit -m "MatchMeal: peer-to-peer dining negotiator"
+   git add .
+   git commit -m "MatchMeal"
    git branch -M main
-   git remote add origin https://github.com/woodyhoko/match-meal.git
+   git remote add origin https://github.com/<you>/match-meal.git
    git push -u origin main
    ```
-3. **Enable Pages:** in the repo, go to **Settings → Pages → Build and deployment → Source: Deploy from a branch**, then choose **Branch: `main`** and **Folder: `/ (root)`** and click **Save**.
-4. After a minute, your site is live at:
+3. The included workflow turns Pages on automatically. (Or, without the workflow: **Settings → Pages → Deploy from a branch → `main` / `/root`**.)
 
-   **https://woodyhoko.github.io/match-meal/**
+A social/link-preview image (`og.jpg`) and OpenGraph/Twitter meta tags are included, so shared links unfurl with a proper card. After first sharing, prime the cache via the [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) / X Card Validator.
 
-   GitHub Pages is served over **HTTPS**, which is exactly what geolocation and WebGPU require — so the full app works on the deployed URL.
+> **Note:** GitHub Pages serves the client-side source as-is — that's true of every front-end app. Protection is the LICENSE, not secrecy.
 
-> **Important — Pages serves your client-side source as-is.** This is a purely client-side app, so anyone who visits the site can read its source. That is unavoidable for any front-end web app, and a public repo (the simplest way to host on Pages) makes that source openly browsable too. The code is **protected by the LICENSE (copyright), not by secrecy** — viewing the source does not grant any right to copy, reuse or redistribute it.
+---
 
-## Tech
+## Project layout
 
-Vanilla HTML / CSS / JS · PeerJS over WebRTC data channels · OpenStreetMap Overpass + Nominatim · MediaPipe LiteRT GenAI · Google Gemma (`gemma-4-E2B-it`) · Chrome built-in Prompt API — no build, no backend, one file. All dependencies load from HTTPS CDNs; the only same-origin reference is `index.html` itself, so it runs unchanged at any base path. The peer-to-peer + on-device-AI architecture builds on the author's earlier [ai-mesh](https://github.com/woodyhoko/ai-mesh) project.
+```
+index.html                 The app — new design (v2). Single self-contained file.
+classic.html               The original version (v1). Single self-contained file.
+og.jpg                     1200×630 social / link-preview image.
+.github/workflows/pages.yml  Auto-enable + deploy to GitHub Pages on push.
+LICENSE                    Proprietary, all-rights-reserved.
+README.md                  This file.
+```
+
+Each `*.html` is fully self-contained (HTML + CSS + vanilla JS, no build step). Dependencies load from HTTPS CDNs at runtime.
+
+---
+
+## Tech stack
+
+Vanilla **HTML / CSS / JS** · **PeerJS** over WebRTC data channels · **OpenStreetMap** Overpass + Nominatim · **Google Maps** deep links (reviews/photos/directions) · Chrome built-in **Prompt API** (on-device AI) · **Puter.js** (optional keyless cloud AI) · **QRCode.js** (invite QR). The classic version additionally uses **MediaPipe LiteRT GenAI** + **Gemma** (`gemma-4-E2B-it`) for its on-device fallback. No build, no backend, no framework. The peer-to-peer + on-device-AI approach builds on the author's earlier [ai-mesh](https://github.com/woodyhoko/ai-mesh) project.
+
+---
+
+## Monetization directions (notes)
+
+MatchMeal is free and viral by design; the realistic strategy keeps the share loop free forever and monetizes asymmetrically. Directions being explored, roughly in order:
+
+1. **Validate the high-intent moment** — a small "Get directions / Order delivery / Book a table" action row that appears **after** a place is locked in (the highest-intent instant in dining). Instrument: how many sessions reach lock-in, and how many tap the row.
+2. **Manufacture frequency** — target **work-lunch crews** (the one recurring, co-located use case): saved crews, one-tap "lunch again", a "we're at X" share-out. Optimise *returning tables*, not installs.
+3. **Turn on affiliate revenue** (delivery/reservation CPA) on that action row once volume exists — strictly downstream of the free choice, never biasing the ranking.
+4. **B2B is the real ceiling** — license the privacy-preserving group-decision engine as an embeddable widget (HR/perks, travel, events, dating, team tools), where "preferences never leave the device" is a paid compliance/integration feature; plus low-effort commercial self-host / de-branding licenses.
+
+**The one rule:** never put a paywall or login in the join flow — the viral share is the only acquisition channel.
+
+---
+
+## Roadmap / not yet built
+
+- **Ratings on each card** — a deterministic "table match" score (how well a place fits the combined taste), plus an optional AI rating + one-line take when an AI mode is on (via the structured/function-call output), alongside the existing Google reviews link.
+- **Clearer Find UX** — explain that Find uses your location + everyone's taste (not AI), distinguish "Find places" vs "Show more options", and show a short result summary.
+- **Visible mode indicator** — an always-on chip showing the current response mode (Manual / Taste / On-device AI / Cloud AI) so it's obvious whether and which AI is in use.
+- **Optional inline Google ratings** — behind a user-supplied, referrer-restricted Places API key.
+- **`eat.hoko.xyz`** — a dedicated subdomain for the app.
+- **Simplify / unify** onboarding and settings copy across both versions.
+
+---
 
 ## License
 
 This software is **proprietary**.
 
-**Copyright (c) 2026 woodyhoko. All Rights Reserved.**
+**Copyright © 2026 woodyhoko. All Rights Reserved.**
 
 Reuse, copying, modification, redistribution or hosting of this code is **not permitted**. Viewing the publicly served source does not grant any license to it. See the [LICENSE](LICENSE) file for the full terms.
