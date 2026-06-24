@@ -184,9 +184,15 @@ MatchMeal is free and viral by design; the realistic strategy keeps the share lo
 
 ## Roadmap / not yet built
 
+- **Tinder-style swipe deck (mobile)** — swipe to react, hide a card once you've decided, with a dedicated "match board" view. Pending a usable photo source (see below) and a clean way to reconcile swiping with the auto-respond modes.
+- **Restaurant photos** — there is no reliable *free, keyless* source of real location-specific restaurant photos (Google Places needs a paid key; OpenStreetMap rarely has images; Wikimedia/Wikidata cover only a few notable venues). Likely path: optional, behind a user-supplied key, or AI-generated cuisine art as a decorative placeholder.
 - **Optional inline Google ratings** — show real Google ratings/reviews on the card itself, behind a user-supplied, referrer-restricted Places API key.
 - **`eat.hoko.xyz`** — a dedicated subdomain for the app.
 - **Simplify / unify** onboarding and settings copy across both versions.
+
+### Recently added
+
+A single **consolidated rating** per card (AI score when an AI mode is on, otherwise the deterministic table-match), a **match board** banner showing the current front-runner, **visible rejection reasons** (who turned a place down and why), a **custom free-text preference**, **per-restaurant decision history** that auto-applies when you rejoin a table and see the same place, **name/avatar editing**, a **"who's at the table"** view, **clear-history**, and **smooth, in-place card updates** with a gentle re-ranking animation.
 
 ---
 

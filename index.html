@@ -310,6 +310,27 @@
         .rate-chip.ai { background: var(--accent-soft); color: var(--accent); }
         .rate-chip.ai b { color: var(--accent); }
         .ai-note { font-size: .86rem; color: var(--ink-2); line-height: 1.45; margin-top: 9px; padding: 9px 12px; background: var(--accent-soft); border-radius: 12px; }
+        .objections { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+        .objections .obj { font-size: .82rem; line-height: 1.4; color: var(--ink-2); background: var(--bg-2); border-radius: 10px; padding: 7px 10px; }
+        .objections .obj .oe { font-size: .9rem; }
+        .objections .obj .or { color: var(--muted); }
+        .who-btn { display: flex; align-items: center; gap: 10px; background: none; border: none; padding: 0; cursor: pointer; }
+        #members-list .mrow { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid var(--line); }
+        #members-list .mrow:last-child { border-bottom: none; }
+        #members-list .mr-ava { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-size: 1.4rem; background: var(--bg-2); flex: 0 0 auto; }
+        #members-list .mr-meta { flex: 1; min-width: 0; }
+        #members-list .mr-n { font-weight: 700; font-size: 1rem; }
+        #members-list .mr-you { font-size: .72rem; font-weight: 700; color: var(--accent); background: var(--accent-soft); padding: 1px 7px; border-radius: 999px; margin-left: 4px; }
+        #members-list .mr-pi { font-size: .72rem; color: var(--faint); font-family: ui-monospace, monospace; }
+        #members-list .mr-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); flex: 0 0 auto; }
+        #members-list .mr-dot.off { background: var(--faint); }
+        .lead-banner { align-items: center; gap: 12px; padding: 13px 16px; border-radius: 16px; margin-bottom: 14px; background: linear-gradient(120deg, var(--amber-soft), var(--accent-soft)); border: 1px solid var(--line); animation: fadeUp .35s var(--ease) both; }
+        .lead-banner.won { background: var(--green-soft); border-color: var(--green); }
+        .lead-banner .lb-ico { font-size: 1.7rem; }
+        .lead-banner .lb-x { min-width: 0; }
+        .lead-banner .lb-t { font-weight: 800; font-size: 1.02rem; letter-spacing: -.01em; }
+        .lead-banner .lb-s { font-size: .82rem; color: var(--ink-2); margin-top: 1px; }
+        .lead-banner.won .lb-t, .lead-banner.won .lb-s { color: var(--green); }
         .opt-pitch { font-size: .92rem; color: var(--ink-2); line-height: 1.5; margin: 11px 0 0; }
 
         /* reactions tally */
@@ -444,12 +465,29 @@
         <div class="grab"></div>
         <button class="sheet-x" aria-label="Close">✕</button>
         <h3>Your settings</h3>
-        <p class="sub">Choose how you respond to options. Everything stays on your device.</p>
-        <div class="field-label">How you respond</div>
+        <p class="sub">Everything stays on your device.</p>
+        <div class="field-label">Your name & avatar</div>
+        <div class="row" style="margin-bottom:8px">
+            <input class="input" id="set-name" maxlength="20" placeholder="Your name" style="flex:2" />
+            <button class="btn ghost" id="set-emoji" style="flex:0 0 58px;font-size:1.5rem;padding:0" title="Change avatar"></button>
+        </div>
+        <div id="set-emoji-row" class="emoji-row" style="display:none;margin-bottom:8px"></div>
+        <div class="field-label" style="margin-top:16px">How you respond</div>
         <div id="mode-pick"></div>
         <button class="btn ghost block" id="edit-taste" style="margin-top:18px"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Edit my taste</button>
+        <button class="btn ghost block" id="who-here" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg> Who's at the table</button>
+        <button class="btn ghost block" id="clear-hist" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Clear my saved choices</button>
         <button class="btn soft block" id="leave-table" style="margin-top:10px">Start a fresh table</button>
         <div class="footnote">MatchMeal · © 2026 woodyhoko</div>
+    </div>
+
+    <!-- Members sheet -->
+    <div class="sheet" id="sheet-members">
+        <div class="grab"></div>
+        <button class="sheet-x" aria-label="Close">✕</button>
+        <h3>At the table</h3>
+        <p class="sub">Everyone connected right now.</p>
+        <div id="members-list"></div>
     </div>
 
     <!-- Taste sheet (edit later) -->
@@ -465,7 +503,9 @@
         <div class="field-label">Budget</div>
         <div class="seg" id="taste-budget" style="margin-bottom:18px"></div>
         <div class="field-label">How far?</div>
-        <div class="seg" id="taste-radius" style="margin-bottom:8px"></div>
+        <div class="seg" id="taste-radius" style="margin-bottom:18px"></div>
+        <div class="field-label">Anything else? (your own words)</div>
+        <textarea class="input" id="taste-custom" rows="2" placeholder="e.g. love spicy food, hate loud places, prefer patios. Your AI will honour this." style="margin-bottom:4px"></textarea>
         <button class="btn block" id="taste-save" style="margin-top:18px">Save</button>
     </div>
 
@@ -523,7 +563,7 @@
 
         /* ============================ state ============================ */
         const S = {
-            me: { id: null, name: '', emoji: '😀', loves: [], avoids: [], diet: [], budget: '$$', radius: 2500 },
+            me: { id: null, name: '', emoji: '😀', loves: [], avoids: [], diet: [], budget: '$$', radius: 2500, custom: '', history: {} },
             settings: { mode: 'taste' }, // 'manual' | 'taste' | 'ai'
             loc: null,                 // {lat, lon, label}
             onboarded: false,
@@ -549,7 +589,7 @@
                 if (this.loc) localStorage.setItem('mm2_loc', JSON.stringify(this.loc));
                 localStorage.setItem('mm2_onb', this.onboarded ? '1' : '0');
             },
-            myPrefs() { const m = this.me; return { name: m.name, emoji: m.emoji, loves: m.loves, avoids: m.avoids, diet: m.diet, budget: m.budget, radius: m.radius }; }
+            myPrefs() { const m = this.me; return { name: m.name, emoji: m.emoji, loves: m.loves, avoids: m.avoids, diet: m.diet, budget: m.budget, radius: m.radius, custom: m.custom || '' }; }
         };
 
         // member list (self + online peers) used for ranking & consensus
@@ -582,7 +622,7 @@
             reactPrompt(option) {
                 const p = S.me;
                 return `You react on behalf of a diner to a restaurant suggestion. Reply ONLY as JSON.
-Diner loves: ${p.loves.join(', ') || 'anything'}. Avoids: ${p.avoids.join(', ') || 'nothing'}. Diet: ${p.diet.join(', ') || 'none'}. Budget up to ${p.budget}.
+Diner loves: ${p.loves.join(', ') || 'anything'}. Avoids: ${p.avoids.join(', ') || 'nothing'}. Diet: ${p.diet.join(', ') || 'none'}. Budget up to ${p.budget}.${p.custom ? '\nExtra preferences (honour these): ' + p.custom : ''}
 Suggestion: "${option.name}" (${option.cuisine || 'unknown'}), ${option.dist}m away.
 Rate how good a fit this place is for THIS diner from 1 (poor) to 5 (great). Then pick "in" (happy to go), "ok" (fine, minor worry), or "no" (won't go). One short reason.
 JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
@@ -839,6 +879,9 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             try {
                 for (const o of S.options) {
                     if (o.won || o.reactions[S.me.id]) continue;
+                    // If I've decided on this exact place before, reuse that decision directly.
+                    const past = (S.me.history || {})[o.name.toLowerCase()];
+                    if (past) { setMyReaction(o, past.r, false, { score: past.score || null, reason: (past.reason || 'as before') + ' · remembered', by: past.by || 'history' }); continue; }
                     let v = null, byAI = false;
                     if (S.settings.mode === 'ai' && AI.available) { v = await AI.react(o); byAI = !!v; }
                     else if (S.settings.mode === 'cloud') { v = await AI.cloudReact(o); byAI = !!v; }
@@ -848,11 +891,17 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             } finally { autoBusy = false; }
         }
 
+        function capHistory() { const h = S.me.history || {}; const keys = Object.keys(h); if (keys.length > 600) keys.sort((a, b) => (h[a].ts || 0) - (h[b].ts || 0)).slice(0, keys.length - 600).forEach(k => delete h[k]); }
         function setMyReaction(o, r, human, meta) {
             o.reactions[S.me.id] = r;
             o.notes = o.notes || {};
-            o.notes[S.me.id] = meta ? { r, score: meta.score || null, reason: meta.reason || '', by: meta.by } : { r, by: 'you' };
-            Mesh.emit('REACT', { optionId: o.id, r, score: o.notes[S.me.id].score, reason: o.notes[S.me.id].reason });
+            const note = meta ? { r, score: meta.score || null, reason: meta.reason || '', by: meta.by } : { r, by: 'you' };
+            o.notes[S.me.id] = note;
+            // Remember my decision for this restaurant so it carries across tables.
+            S.me.history = S.me.history || {};
+            S.me.history[o.name.toLowerCase()] = { r, score: note.score || null, reason: note.reason || '', by: note.by, ts: now() };
+            capHistory(); S.save();
+            Mesh.emit('REACT', { optionId: o.id, r, score: note.score, reason: note.reason });
             renderApp();
             if (human) haptic();
         }
@@ -1027,6 +1076,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
                             </div>
                         </aside>
                         <section class="main">
+                            <div class="lead-banner" id="lead-banner" style="display:none"></div>
                             <div class="sec-h"><h2>On the table</h2><span class="n" id="board-n"></span></div>
                             <div id="board"></div>
                         </section>
@@ -1059,45 +1109,88 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             // response-mode chip (this is where you can tell whether AI is in use)
             const mm = modeMeta();
             $('mode-chip').innerHTML = `<span class="mc-ico">${mm.i}</span><span>You react: <b class="mc-k">${mm.k}</b></span><span class="mc-go">Change ›</span>`;
-            // board
+            // board + match summary
             renderBoard();
+            updateLead();
+        }
+        // Match board: the current front-runner everyone's converging on.
+        function updateLead() {
+            const b = $('lead-banner'); if (!b) return;
+            const ranked = rankedOptions();
+            const won = ranked.find(o => o.won);
+            if (won) { b.style.display = 'flex'; b.className = 'lead-banner won'; b.innerHTML = `<span class="lb-ico">🏆</span><div class="lb-x"><div class="lb-t">Matched: ${esc(won.name)}</div><div class="lb-s">everyone's in — enjoy!</div></div>`; return; }
+            const top = ranked[0];
+            if (!top || liveMembers().length < 2) { b.style.display = 'none'; return; }
+            const c = consensusState(top);
+            b.style.display = 'flex'; b.className = 'lead-banner';
+            b.innerHTML = `<span class="lb-ico">🥇</span><div class="lb-x"><div class="lb-t">Leading: ${esc(top.name)}</div><div class="lb-s"><b>${c.ins}/${c.total}</b> in${c.nos ? ` · ${c.nos} not keen` : ''}${c.all ? ' · ready to lock!' : ''}</div></div>`;
         }
 
         function renderMembers() {
             const m = $('members'); const mem = liveMembers();
             const stack = mem.slice(0, 6).map(x => `<div class="ava ${x.me ? 'me' : ''}" title="${esc(x.name)}">${esc(x.emoji)}<span class="dot ${x.online ? '' : 'off'}"></span></div>`).join('');
-            m.innerHTML = `<div class="ava-stack">${stack}</div><span class="mcount">${mem.length === 1 ? 'just you' : mem.length + ' at the table'}</span>
+            m.innerHTML = `<button class="who-btn" id="who-btn" title="See who's at the table"><div class="ava-stack">${stack}</div><span class="mcount">${mem.length === 1 ? 'just you' : mem.length + ' at the table'}</span></button>
                 <button class="btn soft share-mini" id="share-btn"><svg class="ic" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5 8.6 10.5"/></svg> Invite</button>`;
             $('share-btn').onclick = openShare;
+            $('who-btn').onclick = openMembers;
         }
 
-        // FLIP-animated board so re-ranking glides instead of jumping.
+        // Keyed, incremental board: cards persist between renders, so reactions/AI
+        // comments update in place (no full wipe/flash) and re-ranking glides gently.
+        const cardEls = new Map();
         function renderBoard() {
             const board = $('board'); const n = $('board-n');
             const ranked = rankedOptions();
             n.textContent = ranked.length ? `${ranked.length}` : '';
-            if (searching && !ranked.length) { board.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>'; return; }
+            if (searching && !ranked.length) { board.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>'; cardEls.clear(); return; }
             if (!ranked.length) {
                 board.innerHTML = `<div class="empty"><span class="be">🍜</span>${Mesh.conns.size ? 'Nothing on the table yet.<br>Hit <b>Find places</b> to load spots everyone can react to.' : 'Invite a friend, set your spot,<br>then find places together.'}</div>`;
-                return;
+                cardEls.clear(); return;
             }
-            // FLIP: record old positions (x AND y, so grid re-ranking glides too)
+            if (board.querySelector('.empty') || board.querySelector('.skel')) { board.innerHTML = ''; cardEls.clear(); }
+            // FLIP: record positions of cards that already exist
             const first = {};
-            board.querySelectorAll('.opt').forEach(c => { const r = c.getBoundingClientRect(); first[c.dataset.id] = { x: r.left, y: r.top }; });
-            board.innerHTML = '';
-            ranked.forEach((o, idx) => board.appendChild(optCard(o, idx)));
-            // FLIP: invert + play
-            board.querySelectorAll('.opt').forEach(c => {
-                const r = c.getBoundingClientRect(); const f = first[c.dataset.id]; if (!f) return;
-                const dx = f.x - r.left, dy = f.y - r.top;
-                if (dx || dy) { c.style.transform = `translate(${dx}px, ${dy}px)`; c.style.transition = 'none'; requestAnimationFrame(() => { c.style.transition = ''; c.style.transform = ''; }); }
+            cardEls.forEach((c, id) => { const r = c.getBoundingClientRect(); first[id] = { x: r.left, y: r.top }; });
+            // create/update each card in place, and re-append in ranked order
+            const fresh = new Set();
+            ranked.forEach((o, idx) => {
+                let c = cardEls.get(o.id);
+                if (!c) { c = document.createElement('div'); c.dataset.id = o.id; cardEls.set(o.id, c); fresh.add(c); }
+                c.className = optClass(o, idx);
+                c.innerHTML = optInner(o, idx);
+                wireCard(c, o);
+                board.appendChild(c);
+            });
+            // drop cards for options no longer present
+            [...cardEls.keys()].forEach(id => { if (!ranked.find(o => o.id === id)) { cardEls.get(id).remove(); cardEls.delete(id); } });
+            // FLIP play — gentle, only for cards that actually moved
+            cardEls.forEach((c, id) => {
+                if (fresh.has(c)) return;
+                const f = first[id]; if (!f) return;
+                const r = c.getBoundingClientRect(); const dx = f.x - r.left, dy = f.y - r.top;
+                if (Math.abs(dx) > 2 || Math.abs(dy) > 2) {
+                    c.style.transform = `translate(${dx}px, ${dy}px)`; c.style.transition = 'none';
+                    requestAnimationFrame(() => { c.style.transition = 'transform .5s cubic-bezier(.4,0,.15,1)'; c.style.transform = ''; });
+                }
             });
         }
 
-        function optCard(o, idx) {
+        function optClass(o, idx) { return 'opt' + (o.won ? ' won' : (idx === 0 && consensusState(o).total > 1 ? ' top' : '')); }
+        function wireCard(card, o) {
+            if (o.won) return;
+            const react = card.querySelector('.react');
+            if (react) react.onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; const op = findOpt(b.dataset.id); if (op) setMyReaction(op, b.dataset.r, true); };
+            const lock = card.querySelector('[data-lock]');
+            if (lock) lock.onclick = () => { const op = findOpt(o.id); if (op) finalizeOption(op); };
+        }
+        // Who turned it down (or had a concern) and why — visible to the whole table.
+        function objectionsHtml(o, mem, notes) {
+            const objs = mem.filter(m => (o.reactions[m.id] === 'no' || o.reactions[m.id] === 'ok') && notes[m.id] && notes[m.id].reason);
+            if (!objs.length) return '';
+            return `<div class="objections">${objs.map(m => `<div class="obj"><span class="oe">${esc(m.emoji)}</span> ${o.reactions[m.id] === 'no' ? '🙅' : '🤔'} <b>${esc(m.me ? 'You' : m.name)}</b>: <span class="or">${esc(notes[m.id].reason)}</span></div>`).join('')}</div>`;
+        }
+        function optInner(o, idx) {
             const c = consensusState(o);
-            const card = el('div', 'opt' + (o.won ? ' won' : (idx === 0 && c.total > 1 ? ' top' : '')));
-            card.dataset.id = o.id;
             const q = encodeURIComponent(`${o.name} ${o.lat},${o.lon}`);
             const gmaps = `https://www.google.com/maps/search/?api=1&query=${q}`;
             const gdir = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(o.lat + ',' + o.lon)}`;
@@ -1113,10 +1206,10 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             }).join('');
             const my = o.reactions[S.me.id];
             const myNote = notes[S.me.id];
-            const fit = fitScore(o), air = aiRating(o);
+            const fit = fitScore(o), air = aiRating(o), rating = air ? air.avg : fit, ratingAI = !!air;
             const pct = c.total ? Math.round(c.ins / c.total * 100) : 0;
             const blocked = c.nos > 0;
-            card.innerHTML = `
+            return `
                 <div class="opt-head">
                     <div class="opt-ic">${o.won ? '🏆' : (idx === 0 && c.total > 1 ? '🥇' : '🍽️')}${(o.won || (idx === 0 && c.total > 1)) ? `<span class="rankbadge">${o.won ? '✓' : '1'}</span>` : ''}</div>
                     <div style="flex:1;min-width:0">
@@ -1129,14 +1222,14 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
                     </div>
                 </div>
                 <div class="opt-rate">
-                    <span class="rate-chip" title="Table match — how well this fits everyone's taste (loved cuisines, distance). Computed on-device."><span class="st">${stars(fit)}</span> <b>${fit.toFixed(1)}</b> match</span>
-                    ${air ? `<span class="rate-chip ai" title="Average of the agents' AI ratings (1–5)">🧠 <span class="st">${stars(air.avg)}</span> <b>${air.avg.toFixed(1)}</b></span>` : ''}
+                    <span class="rate-chip ${ratingAI ? 'ai' : ''}" title="${ratingAI ? 'AI rating (1–5), averaged across the table&#39;s AI agents' : 'Table match — how well this fits everyone&#39;s taste (loved cuisines, distance), computed on-device'}">${ratingAI ? '🧠 ' : ''}<span class="st">${stars(rating)}</span> <b>${rating.toFixed(1)}</b> ${ratingAI ? 'AI rating' : 'match'}</span>
                 </div>
                 ${o.pitch ? `<div class="opt-pitch">${esc(o.pitch)}</div>` : ''}
                 ${myNote && myNote.reason && (myNote.by === 'ai' || myNote.by === 'cloud') ? `<div class="ai-note">🧠 Your AI: “${esc(myNote.reason)}”</div>` : ''}
                 <div class="tally">${tally}</div>
                 ${o.won ? '' : `<div class="consensus"><div class="cbar ${blocked ? 'blocked' : ''}"><i style="width:${blocked ? 100 : pct}%"></i></div>
                     <div class="clabel">${blocked ? `<b>${c.nos}</b> not keen — needs everyone in` : (c.ins === c.total ? 'everyone\'s in!' : `<b>${c.ins}/${c.total}</b> in · ${c.reacted < c.total ? (c.total - c.reacted) + ' to go' : 'needs everyone'}`)}</div></div>`}
+                ${o.won ? '' : objectionsHtml(o, mem, notes)}
                 ${o.won
                     ? `<div class="won-foot"><span class="big">🎉</span><span>It's settled — enjoy!</span><a class="go" href="${gdir}" target="_blank" rel="noopener">Directions</a></div>`
                     : `<div class="react">
@@ -1145,12 +1238,6 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
                         <button class="rb no ${my === 'no' ? 'sel' : ''}" data-r="no" data-id="${o.id}"><span class="e">🙅</span>Nope</button>
                     </div>
                     ${c.all ? `<button class="btn block lock-btn" data-lock="${o.id}" style="margin-top:11px;background:var(--green);box-shadow:0 10px 24px rgba(22,184,102,.32)"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> ${c.total > 1 ? "Everyone's in — lock it in" : 'Lock this in'}</button>` : ''}`}`;
-            if (!o.won) {
-                card.querySelector('.react').onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; const op = findOpt(b.dataset.id); if (op) setMyReaction(op, b.dataset.r, true); };
-                const lock = card.querySelector('[data-lock]');
-                if (lock) lock.onclick = () => { const op = findOpt(o.id); if (op) finalizeOption(op); };
-            }
-            return card;
         }
 
         /* ============================ sheets ============================ */
@@ -1206,10 +1293,28 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             };
         }
         function syncSettingsSheet() {
+            $('set-name').value = S.me.name;
+            $('set-emoji').textContent = S.me.emoji;
+            $('set-emoji-row').style.display = 'none';
+            $('set-emoji-row').innerHTML = AVATARS.map(a => `<button class="emoji-pick ${a === S.me.emoji ? 'on' : ''}" data-e="${a}">${a}</button>`).join('');
             wireModePick($('mode-pick'), () => S.settings.mode, m => { S.settings.mode = m; S.save(); if (m !== 'manual') autoRespondAll(); });
         }
-        $('leave-table').onclick = () => { if (confirm('Start a brand-new empty table? Current options will clear for you.')) { S.options = []; renderApp(); closeSheets(); } };
+        // name + avatar editing (broadcasts so peers see the change live)
+        $('set-name').oninput = e => { S.me.name = e.target.value; };
+        $('set-name').onchange = () => { if (!S.me.name.trim()) S.me.name = 'Guest ' + uid(2); S.save(); broadcastPrefs(); renderApp(); $('set-name').value = S.me.name; toast('Name updated', 'good'); };
+        $('set-emoji').onclick = () => { const row = $('set-emoji-row'); row.style.display = row.style.display === 'none' ? 'flex' : 'none'; };
+        $('set-emoji-row').onclick = e => { const b = e.target.closest('[data-e]'); if (!b) return; S.me.emoji = b.dataset.e; $('set-emoji').textContent = S.me.emoji; $('set-emoji-row').querySelectorAll('.emoji-pick').forEach(x => x.classList.toggle('on', x === b)); $('set-emoji-row').style.display = 'none'; S.save(); broadcastPrefs(); renderApp(); haptic(); };
+        $('who-here').onclick = () => { closeSheets(); openMembers(); };
+        $('clear-hist').onclick = () => { if (confirm('Clear your saved choices and remembered restaurant decisions on this device?')) { S.me.history = {}; S.save(); toast('Saved choices cleared.', 'good'); } };
+        $('leave-table').onclick = () => { if (confirm('Start a brand-new empty table? Current options will clear for you.')) { S.options = []; cardEls.clear(); $('board').innerHTML = ''; renderApp(); closeSheets(); } };
         $('edit-taste').onclick = () => { closeSheets(); openTaste(); };
+
+        // who's at the table
+        function openMembers() {
+            const mem = liveMembers();
+            $('members-list').innerHTML = mem.map(m => `<div class="mrow"><span class="mr-ava">${esc(m.emoji)}</span><div class="mr-meta"><div class="mr-n">${esc(m.name)}${m.me ? ' <span class="mr-you">you</span>' : ''}</div><div class="mr-pi">${esc(m.id || '…')}</div></div><span class="mr-dot ${m.online ? '' : 'off'}"></span></div>`).join('') + (mem.length === 1 ? '<p class="sub" style="margin-top:14px">Just you so far — tap <b>Invite</b> to bring friends in.</p>' : '');
+            openSheet('sheet-members');
+        }
 
         // taste editor sheet
         function openTaste() {
@@ -1221,9 +1326,10 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             bu.onclick = e => { const b = e.target.closest('[data-b]'); if (!b) return; S.me.budget = b.dataset.b; bu.querySelectorAll('.opt').forEach(x => x.classList.toggle('on', x === b)); haptic(); };
             const ra = $('taste-radius'); ra.innerHTML = RADII.map(([e2, l, v]) => `<button class="opt ${S.me.radius === v ? 'on' : ''}" data-v="${v}">${e2}<div style="font-size:.7rem;font-weight:600;color:var(--muted)">${l}</div></button>`).join('');
             ra.onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; S.me.radius = +b.dataset.v; ra.querySelectorAll('.opt').forEach(x => x.classList.toggle('on', x === b)); haptic(); };
+            $('taste-custom').value = S.me.custom || '';
             openSheet('sheet-taste');
         }
-        $('taste-save').onclick = () => { S.save(); broadcastPrefs(); closeSheets(); toast('Taste saved & shared with your table', 'good'); renderApp(); };
+        $('taste-save').onclick = () => { S.me.custom = $('taste-custom').value.trim(); S.save(); broadcastPrefs(); closeSheets(); toast('Taste saved & shared with your table', 'good'); renderApp(); };
         function broadcastPrefs() { if (Mesh.online) Mesh.emit('HELLO', { name: S.me.name, emoji: S.me.emoji, prefs: S.myPrefs(), peers: [...Mesh.conns.keys()] }); }
 
         // location sheet
