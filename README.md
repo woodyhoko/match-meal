@@ -13,7 +13,7 @@ It's a **single static web app**: no backend, no accounts, no install, no tracki
 
 - [Two versions](#two-versions)
 - [What it does](#what-it-does)
-- [The four response modes](#the-four-response-modes-how-you-react)
+- [The response modes](#the-response-modes-how-you-react)
 - [How it works (architecture)](#how-it-works-architecture)
 - [Restaurant data, ratings & reviews](#restaurant-data-ratings--reviews)
 - [Privacy](#privacy)
@@ -55,7 +55,7 @@ The rest of this README focuses on the **new design** unless noted.
 
 ---
 
-## The four response modes (how you react)
+## The response modes (how you react)
 
 This is the part that's easy to miss, so it's worth stating plainly. Each person chooses **one** mode (during onboarding, changeable anytime in **Settings**). It controls **how your reactions to options happen** — it does **not** affect the restaurant search itself (the search is always location + everyone's taste, no AI).
 
@@ -64,10 +64,12 @@ This is the part that's easy to miss, so it's worth stating plainly. Each person
 | 👆 **I'll tap myself** | Nothing is automatic — you tap 😋/🤔/🙅 on each option. | nothing | fully private |
 | ⚡ **Auto from my taste** | The app reacts instantly using your preferences (loved/avoided cuisines, distance). | nothing | fully private |
 | 🧠 **Auto with on-device AI** | A language model **on your device** reads each option and reacts with nuance. | Chrome/Edge with built-in AI | fully private (stays on device) |
+| 🤖 **Auto with a browser model** | A small open model runs **in your browser** via WebGPU (transformers.js). | WebGPU + one-time model download | fully private (stays on device) |
 | ☁️ **Auto with cloud AI** | A free online model reacts for you — works on any phone. | internet | sends your picks to the online service |
 
 Notes:
 - **On-device AI** uses Chrome's built-in Prompt API (`window.LanguageModel`) — zero download, nothing leaves the device. It's shown disabled with a "needs Chrome AI" note where unavailable.
+- **Browser model** lazy-loads [transformers.js](https://huggingface.co/docs/transformers.js) and runs **`onnx-community/Qwen2.5-0.5B-Instruct`** (4-bit) on WebGPU — private and offline after a one-time ~few-hundred-MB download (cached by the browser). It broadens the private/on-device option beyond Chrome's built-in API to any WebGPU browser. First response is slow (model load + GPU shader compile); subsequent ones are quick. Gated behind WebGPU; falls back to the taste reaction if anything fails.
 - **Cloud AI** lazy-loads a keyless provider ([Puter.js](https://developer.puter.com/)) only when you choose it, so the default experience stays dependency-free. It's hardened with timeouts that fall back to the deterministic taste reaction, so it never hangs.
 - Every AI call has a deterministic fallback, so the app stays fully usable even when no model is available.
 

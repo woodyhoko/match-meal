@@ -473,6 +473,7 @@
         .toast { background: var(--ink); color: var(--bg); font-size: .9rem; font-weight: 600; padding: 12px 18px; border-radius: 14px; box-shadow: var(--shadow-lg); animation: fadeUp .3s var(--ease); }
         .toast.good { background: var(--green); color: #fff; }
         .toast.bad { background: var(--red); color: #fff; }
+        .model-dl { position: fixed; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top) + 10px); z-index: 95; align-items: center; gap: 8px; background: var(--ink); color: var(--bg); font-size: .82rem; font-weight: 600; padding: 9px 16px; border-radius: 999px; box-shadow: var(--shadow-lg); max-width: 92vw; }
 
         /* match celebration */
         #celebrate { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,12,7,.5); backdrop-filter: blur(5px); }
@@ -606,6 +607,7 @@
     </div>
 
     <div id="toasts"></div>
+    <div id="model-dl" class="model-dl" style="display:none"></div>
 
     <!-- Match celebration -->
     <div id="celebrate">
@@ -710,8 +712,8 @@
                 return `You react on behalf of a diner to a restaurant suggestion. Reply ONLY as JSON.
 Diner loves: ${p.loves.join(', ') || 'anything'}. Avoids: ${p.avoids.join(', ') || 'nothing'}. Diet: ${p.diet.join(', ') || 'none'}. Budget up to ${p.budget}.${p.custom ? '\nExtra preferences (honour these): ' + p.custom : ''}
 Suggestion: "${option.name}" (${option.cuisine || 'unknown'}), ${option.dist}m away.
-Rate how good a fit this place is for THIS diner from 1 (poor) to 5 (great). Then pick "in" (happy to go), "ok" (fine, minor worry), or "no" (won't go). One short reason.
-JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
+Rate how good a fit this place is for THIS diner from 1 (poor) to 5 (great). Set "r" to EXACTLY ONE of these words: in (happy to go), ok (fine, minor worry), or no (won't go). "score" is an integer 1-5. "reason" is one short sentence.
+Reply with ONE JSON object and nothing else, e.g. {"r":"in","score":4,"reason":"close by and I love ramen"}`;
             },
             parseReact(text) {
                 try {
@@ -744,8 +746,47 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
                     const text = (r && r.message && r.message.content) || (r && r.text) || (typeof r === 'string' ? r : '');
                     return this.parseReact(text);
                 } catch (e) { console.warn('cloud react failed', e); return null; }
+            },
+            // A small open model running fully in the browser via transformers.js + WebGPU.
+            // Private (stays on device) and works beyond Chrome's built-in AI, at the cost
+            // of a one-time model download. Lazy-loaded only when this mode is used.
+            async browserReact(option) {
+                const pipe = await ensureXfmr();
+                if (!pipe) return null;
+                try {
+                    const out = await pipe([
+                        { role: 'system', content: 'You react for a diner about a restaurant. Reply ONLY with the JSON, nothing else.' },
+                        { role: 'user', content: this.reactPrompt(option) }
+                    ], { max_new_tokens: 96, do_sample: false });
+                    const msg = out && out[0] && out[0].generated_text;
+                    const text = Array.isArray(msg) ? (msg[msg.length - 1].content || '') : (typeof msg === 'string' ? msg : '');
+                    return this.parseReact(text);
+                } catch (e) { console.warn('browser model react failed', e); return null; }
             }
         };
+        // transformers.js on-device model (WebGPU). Default: a ~0.5B instruct model.
+        const BROWSER_MODEL = 'onnx-community/Qwen2.5-0.5B-Instruct';
+        const gpuOK = () => typeof navigator !== 'undefined' && !!navigator.gpu;
+        let xfmr = { pipe: null, promise: null };
+        function ensureXfmr() {
+            if (xfmr.pipe) return Promise.resolve(xfmr.pipe);
+            if (xfmr.promise) return xfmr.promise;
+            if (!gpuOK()) return Promise.resolve(null);
+            const dl = $('model-dl');
+            xfmr.promise = (async () => {
+                try {
+                    if (dl) { dl.style.display = 'flex'; dl.textContent = 'Loading on-device model…'; }
+                    const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3');
+                    const pipe = await pipeline('text-generation', BROWSER_MODEL, {
+                        dtype: 'q4', device: 'webgpu',
+                        progress_callback: p => { if (dl && p && p.status === 'progress' && p.total) dl.textContent = `Downloading on-device model… ${Math.round(p.loaded / p.total * 100)}% (one-time)`; }
+                    });
+                    xfmr.pipe = pipe; return pipe;
+                } catch (e) { console.warn('transformers.js load failed', e); xfmr.promise = null; toast('Could not load the on-device model.', 'bad'); return null; }
+                finally { if (dl) dl.style.display = 'none'; }
+            })();
+            return xfmr.promise;
+        }
         // Lazy-load Puter only when cloud AI is actually used, so the default
         // experience stays dependency-free and nothing phones home unless chosen.
         let puterPromise = null;
@@ -918,7 +959,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
 
         let searching = false, lastSearchMsg = '';
         function modeMeta() {
-            return { manual: { i: '👆', k: 'Manual (you tap)' }, taste: { i: '⚡', k: 'Auto · your taste' }, ai: { i: '🧠', k: 'Auto · on-device AI' }, cloud: { i: '☁️', k: 'Auto · cloud AI' } }[S.settings.mode] || { i: '⚡', k: 'Auto · your taste' };
+            return { manual: { i: '👆', k: 'Manual (you tap)' }, taste: { i: '⚡', k: 'Auto · your taste' }, ai: { i: '🧠', k: 'Auto · on-device AI' }, browser: { i: '🤖', k: 'Auto · browser model' }, cloud: { i: '☁️', k: 'Auto · cloud AI' } }[S.settings.mode] || { i: '⚡', k: 'Auto · your taste' };
         }
         async function findPlaces() {
             if (searching) return;
@@ -975,6 +1016,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
                     let v = null, byAI = false;
                     if (S.settings.mode === 'ai' && AI.available) { o._think = true; renderApp(); v = await AI.react(o); o._think = false; byAI = !!v; }
                     else if (S.settings.mode === 'cloud') { o._think = true; renderApp(); v = await AI.cloudReact(o); o._think = false; byAI = !!v; }
+                    else if (S.settings.mode === 'browser') { o._think = true; renderApp(); v = await AI.browserReact(o); o._think = false; byAI = !!v; }
                     if (!v) v = smartReact(o);
                     setMyReaction(o, v.r, false, { score: v.score || null, reason: v.reason || '', by: byAI ? S.settings.mode : 'taste' });
                 }
@@ -1048,7 +1090,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
         // Average of the AI/agent scores members have given this option (if any).
         function aiRating(o) {
             const notes = o.notes || {};
-            const scored = Object.values(notes).filter(n => n && n.score && (n.by === 'ai' || n.by === 'cloud'));
+            const scored = Object.values(notes).filter(n => n && n.score && isAIMode(n.by));
             if (!scored.length) return null;
             const avg = scored.reduce((a, n) => a + n.score, 0) / scored.length;
             return { avg: Math.round(avg * 10) / 10, n: scored.length };
@@ -1338,7 +1380,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             const myNote = notes[S.me.id], noteEl = card.querySelector('.ai-note');
             let noteHtml = '';
             if (o._think) noteHtml = `<span class="thinking">🧠 thinking<span class="dots"><i></i><i></i><i></i></span></span>`;
-            else if (myNote && myNote.reason && (myNote.by === 'ai' || myNote.by === 'cloud')) noteHtml = `🧠 Your AI: “${esc(myNote.reason)}”`;
+            else if (myNote && myNote.reason && isAIMode(myNote.by)) noteHtml = `🧠 Your AI: “${esc(myNote.reason)}”`;
             if (setRegion(noteEl, noteHtml)) { noteEl.hidden = !noteHtml; if (noteHtml && !o._think) { noteEl.style.animation = 'none'; void noteEl.offsetWidth; noteEl.style.animation = 'aiIn .42s var(--ease)'; } }
             // tally — tap a face to see that person's take; hover shows their status.
             const sel = revealed.get(o.id);
@@ -1413,15 +1455,18 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
         const MODES = [
             { key: 'manual', ico: '👆', t: "I'll tap myself", d: 'Review each option and react when you want.' },
             { key: 'taste', ico: '⚡', t: 'Auto from my taste', d: 'React instantly from your preferences — no AI, works on any phone.' },
-            { key: 'ai', ico: '🧠', t: 'Auto with on-device AI', d: 'Smarter, nuanced reactions. Stays private on your device.' },
+            { key: 'ai', ico: '🧠', t: 'Auto with on-device AI', d: 'Smarter, nuanced reactions. Stays private on your device.', need: 'ai' },
+            { key: 'browser', ico: '🤖', t: 'Auto with a browser model', d: 'Runs a small open model in your browser (WebGPU). Private & offline after a one-time download (~hundreds of MB).', need: 'gpu' },
             { key: 'cloud', ico: '☁️', t: 'Auto with cloud AI', d: 'Smart reactions via a free online service — works on any phone. Sends your picks to that service.' }
         ];
+        const isAIMode = m => m === 'ai' || m === 'cloud' || m === 'browser';
         function modeCardsHtml(sel) {
             return MODES.map(m => {
-                const dis = m.key === 'ai' && !AI.available;
+                const dis = (m.need === 'ai' && !AI.available) || (m.need === 'gpu' && !gpuOK());
+                const note = dis ? (m.need === 'gpu' ? ' <span style="font-size:.72rem;font-weight:600;color:var(--muted)">(needs WebGPU)</span>' : ' <span style="font-size:.72rem;font-weight:600;color:var(--muted)">(needs Chrome AI)</span>') : '';
                 return `<button class="pick-card ${sel === m.key ? 'on' : ''}" data-mode="${m.key}"${dis ? ' data-dis="1" style="opacity:.55"' : ''}>
                     <div class="pc-ic">${m.ico}</div>
-                    <div style="flex:1"><div class="pc-t">${m.t}${dis ? ' <span style="font-size:.72rem;font-weight:600;color:var(--muted)">(needs Chrome AI)</span>' : ''}</div><div class="pc-d">${m.d}</div></div>
+                    <div style="flex:1"><div class="pc-t">${m.t}${note}</div><div class="pc-d">${m.d}</div></div>
                     <div class="pc-check"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div>
                 </button>`;
             }).join('');
@@ -1431,7 +1476,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             container.innerHTML = modeCardsHtml(getSel());
             container.onclick = e => {
                 const b = e.target.closest('[data-mode]'); if (!b) return;
-                if (b.dataset.dis) { toast('On-device AI needs Chrome with built-in AI.', 'bad'); return; }
+                if (b.dataset.dis) { toast(b.dataset.mode === 'browser' ? 'A browser model needs WebGPU (Chrome/Edge).' : 'On-device AI needs Chrome with built-in AI.', 'bad'); return; }
                 setSel(b.dataset.mode);
                 container.innerHTML = modeCardsHtml(getSel());
                 haptic();
@@ -1627,6 +1672,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             // Detect on-device AI in the background, then refresh AI-dependent UI.
             AI.detect().then(() => {
                 if (!AI.available && S.settings.mode === 'ai') S.settings.mode = 'taste';
+                if (!gpuOK() && S.settings.mode === 'browser') S.settings.mode = 'taste';
                 if (CUR === 'ob' && obStep === 3) renderOnboard();
             }).catch(() => {});
         }
