@@ -140,7 +140,7 @@
             .sec-h { margin-top: 4px; }
             .sec-h h2 { font-size: 1.35rem; }
             /* board becomes a responsive card grid (mobile is a single column) */
-            #board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+            #board { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
             #board .opt { margin-bottom: 0; }
             #board .empty, #board .skel:first-child { grid-column: 1 / -1; }
             .footnote { grid-column: 1 / -1; }
@@ -331,6 +331,22 @@
         .lead-banner .lb-t { font-weight: 800; font-size: 1.02rem; letter-spacing: -.01em; }
         .lead-banner .lb-s { font-size: .82rem; color: var(--ink-2); margin-top: 1px; }
         .lead-banner.won .lb-t, .lead-banner.won .lb-s { color: var(--green); }
+        .sortbtn { font-size: .76rem; font-weight: 700; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; cursor: pointer; box-shadow: var(--shadow-sm); transition: transform .12s var(--ease), background .15s, color .15s, border-color .15s; margin-left: 10px; }
+        .sortbtn:active { transform: scale(.94); }
+        .sortbtn.on { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+        .sortbtn.nudge { color: var(--amber); border-color: var(--amber); animation: pulseSoft 1.7s ease-in-out infinite; }
+        @keyframes pulseSoft { 0%,100% { box-shadow: 0 0 0 0 rgba(255,180,84,0) } 50% { box-shadow: 0 0 0 4px rgba(255,180,84,.16) } }
+        @keyframes aiIn { from { opacity: 0; transform: translateY(-5px) } to { opacity: 1; transform: none } }
+        @keyframes blink { 0%,100% { opacity: .25 } 50% { opacity: 1 } }
+        .ai-note .thinking { display: inline-flex; align-items: center; gap: 7px; color: var(--accent); font-weight: 600; }
+        .ai-note .thinking .dots { display: inline-flex; gap: 4px; }
+        .ai-note .thinking .dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: blink 1s infinite; }
+        .ai-note .thinking .dots i:nth-child(2) { animation-delay: .2s }
+        .ai-note .thinking .dots i:nth-child(3) { animation-delay: .4s }
+        /* equal-height cards (especially per row in the desktop grid) */
+        .opt { display: flex; flex-direction: column; }
+        .opt .actions { margin-top: auto; }
+        .opt .actions:empty { display: none; }
         .opt-pitch { font-size: .92rem; color: var(--ink-2); line-height: 1.5; margin: 11px 0 0; }
 
         /* reactions tally */
@@ -883,8 +899,8 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
                     const past = (S.me.history || {})[o.name.toLowerCase()];
                     if (past) { setMyReaction(o, past.r, false, { score: past.score || null, reason: (past.reason || 'as before') + ' · remembered', by: past.by || 'history' }); continue; }
                     let v = null, byAI = false;
-                    if (S.settings.mode === 'ai' && AI.available) { v = await AI.react(o); byAI = !!v; }
-                    else if (S.settings.mode === 'cloud') { v = await AI.cloudReact(o); byAI = !!v; }
+                    if (S.settings.mode === 'ai' && AI.available) { o._think = true; renderApp(); v = await AI.react(o); o._think = false; byAI = !!v; }
+                    else if (S.settings.mode === 'cloud') { o._think = true; renderApp(); v = await AI.cloudReact(o); o._think = false; byAI = !!v; }
                     if (!v) v = smartReact(o);
                     setMyReaction(o, v.r, false, { score: v.score || null, reason: v.reason || '', by: byAI ? S.settings.mode : 'taste' });
                 }
@@ -1077,7 +1093,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
                         </aside>
                         <section class="main">
                             <div class="lead-banner" id="lead-banner" style="display:none"></div>
-                            <div class="sec-h"><h2>On the table</h2><span class="n" id="board-n"></span></div>
+                            <div class="sec-h"><h2>On the table</h2><span class="n" id="board-n"></span><button class="sortbtn" id="sort-btn" style="display:none"></button></div>
                             <div id="board"></div>
                         </section>
                     </div>
@@ -1087,6 +1103,7 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
                 $('open-settings').onclick = openSettings;
                 $('mode-chip').onclick = openSettings;
                 $('find-btn').onclick = findPlaces;
+                $('sort-btn').onclick = () => { sortByRank = !sortByRank; renderBoard(); haptic(); toast(sortByRank ? 'Sorted by best match — updates live' : 'Back to the order they arrived', ''); };
                 $('locbar').onclick = () => openSheet('sheet-loc');
             }
             // status
@@ -1135,35 +1152,42 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             $('who-btn').onclick = openMembers;
         }
 
-        // Keyed, incremental board: cards persist between renders, so reactions/AI
-        // comments update in place (no full wipe/flash) and re-ranking glides gently.
+        // ---- board: stable order by default; only sort on demand ----
+        let sortByRank = false;
         const cardEls = new Map();
+        function displayOptions() {
+            if (sortByRank) return rankedOptions();
+            // keep the arrival order while people respond; pin a finalized pick on top
+            return [...S.options].sort((a, b) => (b.won ? 1 : 0) - (a.won ? 1 : 0));
+        }
+        function rankDiffers() {
+            const disp = displayOptions(), rank = rankedOptions();
+            for (let i = 0; i < disp.length; i++) if (disp[i] !== rank[i]) return true;
+            return false;
+        }
+
         function renderBoard() {
-            const board = $('board'); const n = $('board-n');
-            const ranked = rankedOptions();
-            n.textContent = ranked.length ? `${ranked.length}` : '';
-            if (searching && !ranked.length) { board.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>'; cardEls.clear(); return; }
-            if (!ranked.length) {
+            const board = $('board'), n = $('board-n');
+            const list = displayOptions();
+            n.textContent = list.length ? `${list.length}` : '';
+            if (searching && !list.length) { board.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>'; cardEls.clear(); return; }
+            if (!list.length) {
                 board.innerHTML = `<div class="empty"><span class="be">🍜</span>${Mesh.conns.size ? 'Nothing on the table yet.<br>Hit <b>Find places</b> to load spots everyone can react to.' : 'Invite a friend, set your spot,<br>then find places together.'}</div>`;
-                cardEls.clear(); return;
+                cardEls.clear(); updateSortBtn(); return;
             }
             if (board.querySelector('.empty') || board.querySelector('.skel')) { board.innerHTML = ''; cardEls.clear(); }
-            // FLIP: record positions of cards that already exist
             const first = {};
             cardEls.forEach((c, id) => { const r = c.getBoundingClientRect(); first[id] = { x: r.left, y: r.top }; });
-            // create/update each card in place, and re-append in ranked order
+            const leaderId = (rankedOptions()[0] || {}).id;
             const fresh = new Set();
-            ranked.forEach((o, idx) => {
+            list.forEach(o => {
                 let c = cardEls.get(o.id);
-                if (!c) { c = document.createElement('div'); c.dataset.id = o.id; cardEls.set(o.id, c); fresh.add(c); }
-                c.className = optClass(o, idx);
-                c.innerHTML = optInner(o, idx);
-                wireCard(c, o);
+                if (!c) { c = document.createElement('div'); c.className = 'opt'; c.dataset.id = o.id; c.innerHTML = cardSkeleton(o); wireCard(c); cardEls.set(o.id, c); fresh.add(c); }
+                paintCard(c, o, leaderId);   // granular: only changed regions touch the DOM
                 board.appendChild(c);
             });
-            // drop cards for options no longer present
-            [...cardEls.keys()].forEach(id => { if (!ranked.find(o => o.id === id)) { cardEls.get(id).remove(); cardEls.delete(id); } });
-            // FLIP play — gentle, only for cards that actually moved
+            [...cardEls.keys()].forEach(id => { if (!list.find(o => o.id === id)) { cardEls.get(id).remove(); cardEls.delete(id); } });
+            // FLIP — gentle, only cards that actually moved (and not the just-created ones)
             cardEls.forEach((c, id) => {
                 if (fresh.has(c)) return;
                 const f = first[id]; if (!f) return;
@@ -1173,45 +1197,23 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
                     requestAnimationFrame(() => { c.style.transition = 'transform .5s cubic-bezier(.4,0,.15,1)'; c.style.transform = ''; });
                 }
             });
+            updateSortBtn();
+        }
+        function updateSortBtn() {
+            const sb = $('sort-btn'); if (!sb) return;
+            const diff = !sortByRank && S.options.length > 1 && rankDiffers();
+            sb.className = 'sortbtn' + (sortByRank ? ' on' : '') + (diff ? ' nudge' : '');
+            sb.innerHTML = sortByRank ? '✓ Best match' : (diff ? 'Sort by best match' : 'Sort by best match');
+            sb.style.display = S.options.length > 1 ? '' : 'none';
         }
 
-        function optClass(o, idx) { return 'opt' + (o.won ? ' won' : (idx === 0 && consensusState(o).total > 1 ? ' top' : '')); }
-        function wireCard(card, o) {
-            if (o.won) return;
-            const react = card.querySelector('.react');
-            if (react) react.onclick = e => { const b = e.target.closest('[data-r]'); if (!b) return; const op = findOpt(b.dataset.id); if (op) setMyReaction(op, b.dataset.r, true); };
-            const lock = card.querySelector('[data-lock]');
-            if (lock) lock.onclick = () => { const op = findOpt(o.id); if (op) finalizeOption(op); };
-        }
-        // Who turned it down (or had a concern) and why — visible to the whole table.
-        function objectionsHtml(o, mem, notes) {
-            const objs = mem.filter(m => (o.reactions[m.id] === 'no' || o.reactions[m.id] === 'ok') && notes[m.id] && notes[m.id].reason);
-            if (!objs.length) return '';
-            return `<div class="objections">${objs.map(m => `<div class="obj"><span class="oe">${esc(m.emoji)}</span> ${o.reactions[m.id] === 'no' ? '🙅' : '🤔'} <b>${esc(m.me ? 'You' : m.name)}</b>: <span class="or">${esc(notes[m.id].reason)}</span></div>`).join('')}</div>`;
-        }
-        function optInner(o, idx) {
-            const c = consensusState(o);
+        // Static parts (built once); dynamic parts filled by paintCard.
+        function cardSkeleton(o) {
             const q = encodeURIComponent(`${o.name} ${o.lat},${o.lon}`);
             const gmaps = `https://www.google.com/maps/search/?api=1&query=${q}`;
-            const gdir = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(o.lat + ',' + o.lon)}`;
-            const mem = liveMembers();
-            const notes = o.notes || {};
-            const tally = mem.map(m => {
-                const r = o.reactions[m.id];
-                const cls = r || 'pending';
-                const face = r === 'in' ? '😋' : r === 'ok' ? '🤔' : r === 'no' ? '🙅' : '⏳';
-                const note = notes[m.id]; const why = note && note.reason ? ` — ${note.reason}` : '';
-                const label = r ? ({ in: 'in', ok: 'meh', no: 'no' }[r]) : 'waiting';
-                return `<span class="who ${cls}" title="${esc(m.name + ': ' + label + why)}"><span class="fe">${esc(m.emoji)}</span>${face}</span>`;
-            }).join('');
-            const my = o.reactions[S.me.id];
-            const myNote = notes[S.me.id];
-            const fit = fitScore(o), air = aiRating(o), rating = air ? air.avg : fit, ratingAI = !!air;
-            const pct = c.total ? Math.round(c.ins / c.total * 100) : 0;
-            const blocked = c.nos > 0;
             return `
                 <div class="opt-head">
-                    <div class="opt-ic">${o.won ? '🏆' : (idx === 0 && c.total > 1 ? '🥇' : '🍽️')}${(o.won || (idx === 0 && c.total > 1)) ? `<span class="rankbadge">${o.won ? '✓' : '1'}</span>` : ''}</div>
+                    <div class="opt-ic"></div>
                     <div style="flex:1;min-width:0">
                         <div class="opt-tt">${esc(o.name)}</div>
                         <div class="opt-meta">
@@ -1221,23 +1223,66 @@ JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
                         </div>
                     </div>
                 </div>
-                <div class="opt-rate">
-                    <span class="rate-chip ${ratingAI ? 'ai' : ''}" title="${ratingAI ? 'AI rating (1–5), averaged across the table&#39;s AI agents' : 'Table match — how well this fits everyone&#39;s taste (loved cuisines, distance), computed on-device'}">${ratingAI ? '🧠 ' : ''}<span class="st">${stars(rating)}</span> <b>${rating.toFixed(1)}</b> ${ratingAI ? 'AI rating' : 'match'}</span>
-                </div>
+                <div class="opt-rate"></div>
                 ${o.pitch ? `<div class="opt-pitch">${esc(o.pitch)}</div>` : ''}
-                ${myNote && myNote.reason && (myNote.by === 'ai' || myNote.by === 'cloud') ? `<div class="ai-note">🧠 Your AI: “${esc(myNote.reason)}”</div>` : ''}
-                <div class="tally">${tally}</div>
-                ${o.won ? '' : `<div class="consensus"><div class="cbar ${blocked ? 'blocked' : ''}"><i style="width:${blocked ? 100 : pct}%"></i></div>
-                    <div class="clabel">${blocked ? `<b>${c.nos}</b> not keen — needs everyone in` : (c.ins === c.total ? 'everyone\'s in!' : `<b>${c.ins}/${c.total}</b> in · ${c.reacted < c.total ? (c.total - c.reacted) + ' to go' : 'needs everyone'}`)}</div></div>`}
-                ${o.won ? '' : objectionsHtml(o, mem, notes)}
-                ${o.won
-                    ? `<div class="won-foot"><span class="big">🎉</span><span>It's settled — enjoy!</span><a class="go" href="${gdir}" target="_blank" rel="noopener">Directions</a></div>`
-                    : `<div class="react">
-                        <button class="rb in ${my === 'in' ? 'sel' : ''}" data-r="in" data-id="${o.id}"><span class="e">😋</span>I'm in</button>
-                        <button class="rb ok ${my === 'ok' ? 'sel' : ''}" data-r="ok" data-id="${o.id}"><span class="e">🤔</span>Meh</button>
-                        <button class="rb no ${my === 'no' ? 'sel' : ''}" data-r="no" data-id="${o.id}"><span class="e">🙅</span>Nope</button>
-                    </div>
-                    ${c.all ? `<button class="btn block lock-btn" data-lock="${o.id}" style="margin-top:11px;background:var(--green);box-shadow:0 10px 24px rgba(22,184,102,.32)"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> ${c.total > 1 ? "Everyone's in — lock it in" : 'Lock this in'}</button>` : ''}`}`;
+                <div class="ai-note" hidden></div>
+                <div class="tally"></div>
+                <div class="consensus" hidden></div>
+                <div class="objections"></div>
+                <div class="actions"></div>`;
+        }
+        // Update a region ONLY when its content changed — no whole-card rebuild, no flash.
+        function setRegion(elm, html) { if (elm && elm.dataset.h !== html) { elm.dataset.h = html; elm.innerHTML = html; return true; } return false; }
+        function paintCard(card, o, leaderId) {
+            const c = consensusState(o), mem = liveMembers(), notes = o.notes || {};
+            const isTop = !o.won && o.id === leaderId && c.total > 1;
+            const cls = 'opt' + (o.won ? ' won' : (isTop ? ' top' : ''));
+            if (card.className !== cls) card.className = cls;
+            const gdir = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(o.lat + ',' + o.lon)}`;
+            setRegion(card.querySelector('.opt-ic'), `${o.won ? '🏆' : isTop ? '🥇' : '🍽️'}${(o.won || isTop) ? `<span class="rankbadge">${o.won ? '✓' : '1'}</span>` : ''}`);
+            const fit = fitScore(o), air = aiRating(o), rating = air ? air.avg : fit, ratingAI = !!air;
+            setRegion(card.querySelector('.opt-rate'), `<span class="rate-chip ${ratingAI ? 'ai' : ''}" title="${ratingAI ? 'AI rating (1–5), averaged across the table&#39;s AI agents' : 'Table match — how well this fits everyone&#39;s taste (loved cuisines, distance), computed on-device'}">${ratingAI ? '🧠 ' : ''}<span class="st">${stars(rating)}</span> <b>${rating.toFixed(1)}</b> ${ratingAI ? 'AI rating' : 'match'}</span>`);
+            // my AI comment / thinking — gentle fade-in when it lands
+            const myNote = notes[S.me.id], noteEl = card.querySelector('.ai-note');
+            let noteHtml = '';
+            if (o._think) noteHtml = `<span class="thinking">🧠 thinking<span class="dots"><i></i><i></i><i></i></span></span>`;
+            else if (myNote && myNote.reason && (myNote.by === 'ai' || myNote.by === 'cloud')) noteHtml = `🧠 Your AI: “${esc(myNote.reason)}”`;
+            if (setRegion(noteEl, noteHtml)) { noteEl.hidden = !noteHtml; if (noteHtml && !o._think) { noteEl.style.animation = 'none'; void noteEl.offsetWidth; noteEl.style.animation = 'aiIn .42s var(--ease)'; } }
+            // tally
+            setRegion(card.querySelector('.tally'), mem.map(m => {
+                const r = o.reactions[m.id], rc = r || 'pending';
+                const face = r === 'in' ? '😋' : r === 'ok' ? '🤔' : r === 'no' ? '🙅' : '⏳';
+                const note = notes[m.id], why = note && note.reason ? ` — ${note.reason}` : '';
+                const label = r ? ({ in: 'in', ok: 'meh', no: 'no' }[r]) : 'waiting';
+                return `<span class="who ${rc}" title="${esc(m.name + ': ' + label + why)}"><span class="fe">${esc(m.emoji)}</span>${face}</span>`;
+            }).join(''));
+            // consensus
+            const consEl = card.querySelector('.consensus');
+            consEl.hidden = !!o.won;
+            if (!o.won) {
+                const pct = c.total ? Math.round(c.ins / c.total * 100) : 0, blocked = c.nos > 0;
+                setRegion(consEl, `<div class="cbar ${blocked ? 'blocked' : ''}"><i style="width:${blocked ? 100 : pct}%"></i></div><div class="clabel">${blocked ? `<b>${c.nos}</b> not keen — needs everyone in` : (c.ins === c.total ? "everyone's in!" : `<b>${c.ins}/${c.total}</b> in · ${c.reacted < c.total ? (c.total - c.reacted) + ' to go' : 'needs everyone'}`)}</div>`);
+            }
+            // objections
+            const objs = mem.filter(m => (o.reactions[m.id] === 'no' || o.reactions[m.id] === 'ok') && notes[m.id] && notes[m.id].reason);
+            setRegion(card.querySelector('.objections'), o.won ? '' : objs.map(m => `<div class="obj"><span class="oe">${esc(m.emoji)}</span> ${o.reactions[m.id] === 'no' ? '🙅' : '🤔'} <b>${esc(m.me ? 'You' : m.name)}</b>: <span class="or">${esc(notes[m.id].reason)}</span></div>`).join(''));
+            // actions
+            const my = o.reactions[S.me.id];
+            setRegion(card.querySelector('.actions'), o.won
+                ? `<div class="won-foot"><span class="big">🎉</span><span>It's settled — enjoy!</span><a class="go" href="${gdir}" target="_blank" rel="noopener">Directions</a></div>`
+                : `<div class="react">
+                        <button class="rb in ${my === 'in' ? 'sel' : ''}" data-r="in"><span class="e">😋</span>I'm in</button>
+                        <button class="rb ok ${my === 'ok' ? 'sel' : ''}" data-r="ok"><span class="e">🤔</span>Meh</button>
+                        <button class="rb no ${my === 'no' ? 'sel' : ''}" data-r="no"><span class="e">🙅</span>Nope</button>
+                    </div>${c.all ? `<button class="btn block lock-btn" data-lock="1" style="margin-top:11px;background:var(--green);box-shadow:0 10px 24px rgba(22,184,102,.32)"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> ${c.total > 1 ? "Everyone's in — lock it in" : 'Lock this in'}</button>` : ''}`);
+        }
+        // Delegated handlers, set once on create — survive region re-renders.
+        function wireCard(card) {
+            card.onclick = e => {
+                const rb = e.target.closest('[data-r]');
+                if (rb) { const op = findOpt(card.dataset.id); if (op && !op.won) setMyReaction(op, rb.dataset.r, true); return; }
+                if (e.target.closest('[data-lock]')) { const op = findOpt(card.dataset.id); if (op) finalizeOption(op); }
+            };
         }
 
         /* ============================ sheets ============================ */
