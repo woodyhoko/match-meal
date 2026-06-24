@@ -97,8 +97,9 @@ See [the four modes](#the-four-response-modes-how-you-react). The "AI" in this a
 ## Restaurant data, ratings & reviews
 
 - **Places** come from the **OpenStreetMap Overpass API** (keyless, with mirror fallbacks). Distances are computed locally with the haversine formula. **Nominatim** handles typing in a location by name.
-- **Ratings, reviews & photos:** every option links straight to its **Google Maps** page (the "★ reviews & photos" link), and the locked-in place's **Directions** open in Google Maps. This gives you Google's real ratings, reviews and photos in one tap, for free, with no API key.
-- **Why not embedded in the cards?** Showing Google's ratings/reviews/photos *inline* requires the paid **Google Places API** with a billable key — unsafe to embed in a public static page, and restricted by Google's terms. OpenStreetMap rarely carries ratings or photos, so Google (via the link) is the right source for those. Embedding them is on the [roadmap](#roadmap--not-yet-built) as an optional, key-required feature.
+- **Ratings on each card:** every option shows a **"Table match"** rating — a deterministic score (★/5) of how well the place fits the *whole table's* taste (loved cuisines, distance), computed on-device. When anyone is in an **AI mode**, the card also shows an **AI rating** (the average of the agents' 1–5 scores, produced via the model's structured/function-call output) and that agent's one-line take. So you get a useful rating even with no AI, and a smarter one when AI is on.
+- **Real reviews & photos:** every option links straight to its **Google Maps** page (the "★ reviews & photos" link), and the locked-in place's **Directions** open in Google Maps — Google's real ratings, reviews and photos in one tap, free, no API key.
+- **Why not embed Google's reviews inline?** That requires the paid **Google Places API** with a billable key — unsafe to embed in a public static page and restricted by Google's terms. OpenStreetMap rarely carries ratings or photos, so Google (via the link) is the right source for those. Embedding them is on the [roadmap](#roadmap--not-yet-built) as an optional, key-required feature.
 
 ---
 
@@ -183,10 +184,7 @@ MatchMeal is free and viral by design; the realistic strategy keeps the share lo
 
 ## Roadmap / not yet built
 
-- **Ratings on each card** — a deterministic "table match" score (how well a place fits the combined taste), plus an optional AI rating + one-line take when an AI mode is on (via the structured/function-call output), alongside the existing Google reviews link.
-- **Clearer Find UX** — explain that Find uses your location + everyone's taste (not AI), distinguish "Find places" vs "Show more options", and show a short result summary.
-- **Visible mode indicator** — an always-on chip showing the current response mode (Manual / Taste / On-device AI / Cloud AI) so it's obvious whether and which AI is in use.
-- **Optional inline Google ratings** — behind a user-supplied, referrer-restricted Places API key.
+- **Optional inline Google ratings** — show real Google ratings/reviews on the card itself, behind a user-supplied, referrer-restricted Places API key.
 - **`eat.hoko.xyz`** — a dedicated subdomain for the app.
 - **Simplify / unify** onboarding and settings copy across both versions.
 

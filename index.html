@@ -273,7 +273,14 @@
 
         /* primary find */
         .find-wrap { margin-bottom: 18px; }
-        .find-hint { text-align: center; color: var(--muted); font-size: .86rem; margin-top: 9px; }
+        .find-head h2 { font-size: 1.12rem; font-weight: 800; letter-spacing: -.02em; margin: 0 0 5px; }
+        .find-explain { font-size: .84rem; color: var(--muted); line-height: 1.5; margin: 0 0 13px; }
+        .find-hint { text-align: center; color: var(--ink-2); font-size: .82rem; margin-top: 10px; line-height: 1.45; }
+        .modechip { display: flex; align-items: center; gap: 9px; width: 100%; margin-top: 12px; padding: 10px 13px; border-radius: 13px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow-sm); font-size: .85rem; font-weight: 600; color: var(--ink-2); transition: transform .12s var(--ease), background .15s; }
+        .modechip:active { transform: scale(.98); background: var(--bg-2); }
+        .modechip .mc-ico { font-size: 1.1rem; }
+        .modechip .mc-k { color: var(--ink); }
+        .modechip .mc-go { margin-left: auto; color: var(--accent); font-weight: 700; }
 
         /* section title */
         .sec-h { display: flex; align-items: baseline; gap: 8px; margin: 6px 2px 12px; }
@@ -294,8 +301,15 @@
         .opt.won .rankbadge { background: var(--green); }
         .opt-tt { font-weight: 800; font-size: 1.12rem; letter-spacing: -.01em; line-height: 1.18; }
         .opt-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; color: var(--muted); font-size: .85rem; margin-top: 4px; }
-        .opt-meta a { color: var(--muted); text-decoration: none; }
+        .opt-meta a { color: var(--accent); text-decoration: none; font-weight: 600; }
         .opt-meta .ic { width: 1em; height: 1em; vertical-align: -.12em; }
+        .opt-rate { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 11px; }
+        .rate-chip { display: inline-flex; align-items: center; gap: 5px; font-size: .82rem; font-weight: 600; color: var(--ink-2); background: var(--bg-2); border-radius: 999px; padding: 4px 11px; }
+        .rate-chip b { color: var(--ink); }
+        .rate-chip .st { color: #f5a524; letter-spacing: 1px; font-size: .82rem; }
+        .rate-chip.ai { background: var(--accent-soft); color: var(--accent); }
+        .rate-chip.ai b { color: var(--accent); }
+        .ai-note { font-size: .86rem; color: var(--ink-2); line-height: 1.45; margin-top: 9px; padding: 9px 12px; background: var(--accent-soft); border-radius: 12px; }
         .opt-pitch { font-size: .92rem; color: var(--ink-2); line-height: 1.5; margin: 11px 0 0; }
 
         /* reactions tally */
@@ -570,16 +584,22 @@
                 return `You react on behalf of a diner to a restaurant suggestion. Reply ONLY as JSON.
 Diner loves: ${p.loves.join(', ') || 'anything'}. Avoids: ${p.avoids.join(', ') || 'nothing'}. Diet: ${p.diet.join(', ') || 'none'}. Budget up to ${p.budget}.
 Suggestion: "${option.name}" (${option.cuisine || 'unknown'}), ${option.dist}m away.
-Pick "in" (happy to go), "ok" (fine, minor worry), or "no" (won't go). One short reason.
-JSON: {"r":"in|ok|no","reason":"..."}`;
+Rate how good a fit this place is for THIS diner from 1 (poor) to 5 (great). Then pick "in" (happy to go), "ok" (fine, minor worry), or "no" (won't go). One short reason.
+JSON: {"r":"in|ok|no","score":1-5,"reason":"..."}`;
             },
             parseReact(text) {
-                try { const o = JSON.parse(extractJson(text)); if (['in', 'ok', 'no'].includes(o.r)) return { r: o.r, reason: (o.reason || '').trim() }; } catch (_) {}
+                try {
+                    const o = JSON.parse(extractJson(text));
+                    if (['in', 'ok', 'no'].includes(o.r)) {
+                        const score = Math.max(1, Math.min(5, Math.round(Number(o.score) || 0))) || null;
+                        return { r: o.r, score, reason: (o.reason || '').trim() };
+                    }
+                } catch (_) {}
                 return null;
             },
             // On-device (Chrome built-in Prompt API)
             async react(option) {
-                const schema = { type: 'object', properties: { r: { type: 'string', enum: ['in', 'ok', 'no'] }, reason: { type: 'string' } }, required: ['r'] };
+                const schema = { type: 'object', properties: { r: { type: 'string', enum: ['in', 'ok', 'no'] }, score: { type: 'number' }, reason: { type: 'string' } }, required: ['r'] };
                 try {
                     const s = await window.LanguageModel.create();
                     let raw;
@@ -629,10 +649,12 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
         function smartReact(option) {
             const cu = (option.cuisine || '').toLowerCase(), nm = (option.name || '').toLowerCase();
             const loves = S.me.loves.map(bareWord), avoids = S.me.avoids.map(bareWord);
-            if (avoids.some(a => a && (cu.includes(a) || nm.includes(a)))) return { r: 'no', reason: `not keen on ${avoids.find(a => cu.includes(a) || nm.includes(a))}` };
-            if (option.dist > S.me.radius * 1.35) return { r: 'ok', reason: `a bit far (${option.dist}m)` };
-            if (loves.some(l => l && (cu.includes(l) || nm.includes(l)))) return { r: 'in', reason: `love ${loves.find(l => cu.includes(l) || nm.includes(l))}` };
-            return { r: 'in', reason: 'works for me' };
+            const av = avoids.find(a => a && (cu.includes(a) || nm.includes(a)));
+            if (av) return { r: 'no', score: 1, reason: `not keen on ${av}` };
+            if (option.dist > S.me.radius * 1.35) return { r: 'ok', score: 3, reason: `a bit far (${option.dist}m)` };
+            const lv = loves.find(l => l && (cu.includes(l) || nm.includes(l)));
+            if (lv) return { r: 'in', score: 5, reason: `love ${lv}` };
+            return { r: 'in', score: 4, reason: 'works for me' };
         }
         const bareWord = s => (s || '').replace(/^[^\p{L}]+/u, '').toLowerCase().trim(); // strip leading emoji
 
@@ -713,23 +735,25 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
             }
         };
         function env(type, payload, ttl = 5) { return { id: rid(), type, from: S.me.id, fromName: S.me.name, fromEmoji: S.me.emoji, ttl, ts: now(), payload }; }
-        function serOpt(o) { return { id: o.id, name: o.name, cuisine: o.cuisine, lat: o.lat, lon: o.lon, dist: o.dist, address: o.address, by: o.by, byName: o.byName, pitch: o.pitch, reactions: o.reactions, won: o.won }; }
+        function serOpt(o) { return { id: o.id, name: o.name, cuisine: o.cuisine, lat: o.lat, lon: o.lon, dist: o.dist, address: o.address, by: o.by, byName: o.byName, pitch: o.pitch, reactions: o.reactions, notes: o.notes || {}, won: o.won }; }
         function findOpt(id) { return S.options.find(o => o.id === id); }
 
         function handle(e) {
             const p = e.payload || {};
             if (e.type === 'SYNC') {
                 (p.members || []).forEach(m => { if (m.id !== S.me.id && !S.members.has(m.id)) S.members.set(m.id, { ...m, online: true }); else if (S.members.get(m.id)) { const x = S.members.get(m.id); x.prefs = x.prefs || m.prefs; } });
-                (p.options || []).forEach(o => { if (!findOpt(o.id)) S.options.push({ ...o, reactions: o.reactions || {} }); });
+                (p.options || []).forEach(o => { if (!findOpt(o.id)) S.options.push({ ...o, reactions: o.reactions || {}, notes: o.notes || {} }); });
                 renderApp(); autoRespondAll(); return;
             }
             if (e.type === 'PROPOSE') {
-                (p.options || []).forEach(o => { if (!findOpt(o.id)) S.options.push({ ...o, reactions: o.reactions || {} }); });
+                (p.options || []).forEach(o => { if (!findOpt(o.id)) S.options.push({ ...o, reactions: o.reactions || {}, notes: o.notes || {} }); });
                 renderApp(); autoRespondAll(); return;
             }
             if (e.type === 'REACT') {
                 const o = findOpt(p.optionId); if (!o) return;
-                o.reactions[e.from] = p.r; renderApp(); return;
+                o.reactions[e.from] = p.r;
+                o.notes = o.notes || {}; o.notes[e.from] = { r: p.r, score: p.score || null, reason: p.reason || '' };
+                renderApp(); return;
             }
             if (e.type === 'FINALIZE') {
                 const o = findOpt(p.optionId); if (!o || o.won) return;
@@ -764,7 +788,10 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
             return s;
         }
 
-        let searching = false;
+        let searching = false, lastSearchMsg = '';
+        function modeMeta() {
+            return { manual: { i: '👆', k: 'Manual (you tap)' }, taste: { i: '⚡', k: 'Auto · your taste' }, ai: { i: '🧠', k: 'Auto · on-device AI' }, cloud: { i: '☁️', k: 'Auto · cloud AI' } }[S.settings.mode] || { i: '⚡', k: 'Auto · your taste' };
+        }
         async function findPlaces() {
             if (searching) return;
             if (!S.loc) { openSheet('sheet-loc'); return; }
@@ -786,6 +813,8 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
                     address: c.address, by: S.me.id, byName: S.me.name, pitch: pitchFor(c, agg), reactions: {}, won: false
                 }));
                 S.options.push(...batch);
+                const km = (Math.max(agg.radius, 1200) / 1000);
+                lastSearchMsg = `Added ${batch.length} spot${batch.length === 1 ? '' : 's'} within ${km % 1 ? km.toFixed(1) : km} km of ${S.loc.label}, best match on top.`;
                 Mesh.emit('PROPOSE', { options: batch.map(serOpt) });
                 renderApp();
                 autoRespondAll();
@@ -810,18 +839,20 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
             try {
                 for (const o of S.options) {
                     if (o.won || o.reactions[S.me.id]) continue;
-                    let v = null;
-                    if (S.settings.mode === 'ai' && AI.available) v = await AI.react(o);
-                    else if (S.settings.mode === 'cloud') v = await AI.cloudReact(o);
+                    let v = null, byAI = false;
+                    if (S.settings.mode === 'ai' && AI.available) { v = await AI.react(o); byAI = !!v; }
+                    else if (S.settings.mode === 'cloud') { v = await AI.cloudReact(o); byAI = !!v; }
                     if (!v) v = smartReact(o);
-                    setMyReaction(o, v.r, false);
+                    setMyReaction(o, v.r, false, { score: v.score || null, reason: v.reason || '', by: byAI ? S.settings.mode : 'taste' });
                 }
             } finally { autoBusy = false; }
         }
 
-        function setMyReaction(o, r, human) {
+        function setMyReaction(o, r, human, meta) {
             o.reactions[S.me.id] = r;
-            Mesh.emit('REACT', { optionId: o.id, r });
+            o.notes = o.notes || {};
+            o.notes[S.me.id] = meta ? { r, score: meta.score || null, reason: meta.reason || '', by: meta.by } : { r, by: 'you' };
+            Mesh.emit('REACT', { optionId: o.id, r, score: o.notes[S.me.id].score, reason: o.notes[S.me.id].reason });
             renderApp();
             if (human) haptic();
         }
@@ -856,6 +887,30 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
                 return a.o.dist - b.o.dist;
             }).map(x => x.o);
         }
+
+        // ---- ratings ----
+        // Deterministic "table match": how well a place fits the WHOLE table's taste
+        // (loved cuisines, avoided cuisines, distance). Always available, no AI.
+        function fitScore(o) {
+            const agg = aggregatePrefs();
+            const cu = (o.cuisine || '').toLowerCase(), nm = (o.name || '').toLowerCase();
+            let s = 3.2;
+            const loveHits = agg.loves.filter(l => l && (cu.includes(l) || nm.includes(l))).length;
+            s += Math.min(loveHits, 2) * 0.8;
+            if ([...agg.avoids].some(a => a && (cu.includes(a) || nm.includes(a)))) s -= 2.6;
+            if (o.dist <= agg.radius * 0.5) s += 0.5;
+            else if (o.dist > agg.radius) s -= Math.min((o.dist - agg.radius) / agg.radius, 1.6);
+            return Math.max(0.5, Math.min(5, Math.round(s * 2) / 2));
+        }
+        // Average of the AI/agent scores members have given this option (if any).
+        function aiRating(o) {
+            const notes = o.notes || {};
+            const scored = Object.values(notes).filter(n => n && n.score && (n.by === 'ai' || n.by === 'cloud'));
+            if (!scored.length) return null;
+            const avg = scored.reduce((a, n) => a + n.score, 0) / scored.length;
+            return { avg: Math.round(avg * 10) / 10, n: scored.length };
+        }
+        const stars = n => '★'.repeat(Math.round(n)) + '☆'.repeat(5 - Math.round(n));
 
         /* ============================ rendering ============================ */
         let CUR = 'app';
@@ -963,7 +1018,13 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
                         <aside class="side">
                             <div class="members" id="members"></div>
                             <div class="locbar" id="locbar"></div>
-                            <div class="find-wrap"><button class="btn block lg" id="find-btn"></button><div class="find-hint" id="find-hint"></div></div>
+                            <div class="find-wrap">
+                                <div class="find-head"><h2>Find a place</h2></div>
+                                <p class="find-explain">Searches real spots near you and ranks them by your whole table's taste. (No AI needed — that's just for reactions.)</p>
+                                <button class="btn block lg" id="find-btn"></button>
+                                <div class="find-hint" id="find-hint"></div>
+                                <button class="modechip" id="mode-chip" title="How you react to options — tap to change"></button>
+                            </div>
                         </aside>
                         <section class="main">
                             <div class="sec-h"><h2>On the table</h2><span class="n" id="board-n"></span></div>
@@ -972,7 +1033,9 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
                     </div>
                     <div class="footnote"><a href="classic.html">classic version</a> · © 2026 woodyhoko</div>`;
                 shell.appendChild(root);
-                $('open-settings').onclick = () => { syncSettingsSheet(); openSheet('sheet-settings'); };
+                const openSettings = () => { syncSettingsSheet(); openSheet('sheet-settings'); };
+                $('open-settings').onclick = openSettings;
+                $('mode-chip').onclick = openSettings;
                 $('find-btn').onclick = findPlaces;
                 $('locbar').onclick = () => openSheet('sheet-loc');
             }
@@ -988,11 +1051,14 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
                 ? `<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> <b>${esc(S.loc.label)}</b> <span class="chg">change</span>`
                 : `<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> <span style="color:var(--muted)">Set your location to search</span> <span class="chg">set</span>`;
             // find button
-            $('find-btn').disabled = searching;
+            $('find-btn').disabled = searching || !S.loc;
             $('find-btn').innerHTML = searching
                 ? `<svg class="ic" viewBox="0 0 24 24" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.2-8.5"/></svg> Finding great spots…`
-                : `<svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg> ${S.options.length ? 'Find more places' : 'Find places nearby'}`;
-            $('find-hint').textContent = S.options.length ? '' : (np ? "considers everyone's taste at the table" : 'invite friends, then find a place together');
+                : `<svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg> ${!S.loc ? 'Set your location first' : (S.options.length ? 'Show 6 more options' : 'Find places nearby')}`;
+            $('find-hint').textContent = searching ? '' : (lastSearchMsg || (!S.loc ? '' : (np ? "ranked by everyone's taste at the table" : 'invite friends first, or find a place solo')));
+            // response-mode chip (this is where you can tell whether AI is in use)
+            const mm = modeMeta();
+            $('mode-chip').innerHTML = `<span class="mc-ico">${mm.i}</span><span>You react: <b class="mc-k">${mm.k}</b></span><span class="mc-go">Change ›</span>`;
             // board
             renderBoard();
         }
@@ -1036,13 +1102,18 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
             const gmaps = `https://www.google.com/maps/search/?api=1&query=${q}`;
             const gdir = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(o.lat + ',' + o.lon)}`;
             const mem = liveMembers();
+            const notes = o.notes || {};
             const tally = mem.map(m => {
                 const r = o.reactions[m.id];
                 const cls = r || 'pending';
                 const face = r === 'in' ? '😋' : r === 'ok' ? '🤔' : r === 'no' ? '🙅' : '⏳';
-                return `<span class="who ${cls}" title="${esc(m.name)}"><span class="fe">${esc(m.emoji)}</span>${face}</span>`;
+                const note = notes[m.id]; const why = note && note.reason ? ` — ${note.reason}` : '';
+                const label = r ? ({ in: 'in', ok: 'meh', no: 'no' }[r]) : 'waiting';
+                return `<span class="who ${cls}" title="${esc(m.name + ': ' + label + why)}"><span class="fe">${esc(m.emoji)}</span>${face}</span>`;
             }).join('');
             const my = o.reactions[S.me.id];
+            const myNote = notes[S.me.id];
+            const fit = fitScore(o), air = aiRating(o);
             const pct = c.total ? Math.round(c.ins / c.total * 100) : 0;
             const blocked = c.nos > 0;
             card.innerHTML = `
@@ -1057,7 +1128,12 @@ JSON: {"r":"in|ok|no","reason":"..."}`;
                         </div>
                     </div>
                 </div>
+                <div class="opt-rate">
+                    <span class="rate-chip" title="Table match — how well this fits everyone's taste (loved cuisines, distance). Computed on-device."><span class="st">${stars(fit)}</span> <b>${fit.toFixed(1)}</b> match</span>
+                    ${air ? `<span class="rate-chip ai" title="Average of the agents' AI ratings (1–5)">🧠 <span class="st">${stars(air.avg)}</span> <b>${air.avg.toFixed(1)}</b></span>` : ''}
+                </div>
                 ${o.pitch ? `<div class="opt-pitch">${esc(o.pitch)}</div>` : ''}
+                ${myNote && myNote.reason && (myNote.by === 'ai' || myNote.by === 'cloud') ? `<div class="ai-note">🧠 Your AI: “${esc(myNote.reason)}”</div>` : ''}
                 <div class="tally">${tally}</div>
                 ${o.won ? '' : `<div class="consensus"><div class="cbar ${blocked ? 'blocked' : ''}"><i style="width:${blocked ? 100 : pct}%"></i></div>
                     <div class="clabel">${blocked ? `<b>${c.nos}</b> not keen — needs everyone in` : (c.ins === c.total ? 'everyone\'s in!' : `<b>${c.ins}/${c.total}</b> in · ${c.reacted < c.total ? (c.total - c.reacted) + ' to go' : 'needs everyone'}`)}</div></div>`}
