@@ -225,6 +225,14 @@
         .seg { display: flex; gap: 8px; }
         .seg .opt { flex: 1; text-align: center; padding: 13px 6px; border-radius: 14px; font-weight: 700; font-size: 1rem; background: var(--card); border: 1.5px solid var(--line-2); color: var(--ink-2); transition: .15s var(--ease); }
         .seg .opt.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+        .modelseg { display: flex; gap: 8px; }
+        .modelseg .modelopt { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; padding: 11px 6px; border-radius: 14px; background: var(--card); border: 1.5px solid var(--line-2); color: var(--ink-2); transition: .15s var(--ease); cursor: pointer; }
+        .modelseg .modelopt:active { transform: scale(.97); }
+        .modelseg .modelopt b { font-size: .92rem; font-weight: 800; }
+        .modelseg .modelopt span { font-size: .72rem; color: var(--muted); font-weight: 700; }
+        .modelseg .modelopt small { font-size: .68rem; color: var(--faint); line-height: 1.25; }
+        .modelseg .modelopt.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+        .modelseg .modelopt.on span, .modelseg .modelopt.on small { color: var(--accent); }
 
         .pick-card {
             display: flex; gap: 14px; align-items: center; width: 100%; text-align: left;
@@ -293,7 +301,7 @@
         #board { position: relative; }
         .opt {
             background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; margin-bottom: 14px; box-shadow: var(--shadow-sm);
-            transition: transform .45s var(--ease), box-shadow .25s, border-color .25s; animation: fadeUp .45s var(--ease) both; will-change: transform;
+            transition: transform .45s var(--ease), box-shadow .25s, border-color .25s; will-change: transform;
         }
         .opt.top { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow); }
         .opt.won { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-soft), var(--shadow); }
@@ -395,6 +403,13 @@
         .tally .who.has-note::after { content: '💬'; font-size: .62rem; margin-left: 1px; opacity: .6; }
         .tally .who.open { outline: 2px solid var(--accent); outline-offset: 1px; }
         .who-comment { margin-top: 10px; font-size: .86rem; line-height: 1.45; color: var(--ink-2); background: var(--bg-2); border-radius: 12px; padding: 9px 12px; }
+        .who-comment .wc-memo { display: inline-block; margin-top: 3px; color: var(--ink); }
+        /* optional "why?" memo on a card you reacted to */
+        .opt-note { margin-top: 10px; }
+        .opt-note .on-toggle { font-size: .8rem; font-weight: 700; color: var(--muted); background: none; border: 0; padding: 5px 2px; cursor: pointer; text-align: left; border-radius: 8px; }
+        .opt-note .on-toggle:active { transform: scale(.97); }
+        .opt-note .on-hint { font-size: .76rem; color: var(--accent); font-weight: 700; margin: 0 2px 7px; line-height: 1.4; animation: aiIn .3s var(--ease); }
+        .opt-note .on-i { padding: 11px 14px; font-size: .9rem; border-radius: 13px; }
 
         /* consensus bar */
         .consensus { margin-top: 13px; }
@@ -529,6 +544,7 @@
         <div id="set-emoji-row" class="emoji-row" style="display:none;margin-bottom:8px"></div>
         <div class="field-label" style="margin-top:16px">How you respond</div>
         <div id="mode-pick"></div>
+        <div id="model-pick" style="margin-top:10px;display:none"></div>
         <button class="btn ghost block" id="edit-taste" style="margin-top:18px"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Edit my taste</button>
         <button class="btn ghost block" id="who-here" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg> Who's at the table</button>
         <button class="btn ghost block" id="saved-prefs" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> Saved choices &amp; history</button>
@@ -794,28 +810,63 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 } catch (e) { console.warn('browser model react failed', e); return null; }
             }
         };
-        // transformers.js on-device model (WebGPU). Default: a ~0.5B instruct model.
-        const BROWSER_MODEL = 'onnx-community/Qwen2.5-0.5B-Instruct';
+        // On-device browser models (transformers.js + WebGPU). Smaller = faster to
+        // download and quicker to react, just a bit less nuanced. We DEFAULT to the
+        // lightest model that runs smoothly so phones aren't stuck waiting, and let
+        // people opt up to a smarter one in Settings.
+        const BROWSER_MODELS = [
+            { id: 'HuggingFaceTB/SmolLM2-135M-Instruct', label: 'Fastest', size: '~135M', note: 'Lightest · best on phones', dtype: 'q4' },
+            { id: 'HuggingFaceTB/SmolLM2-360M-Instruct', label: 'Balanced', size: '~360M', note: 'Good speed & quality', dtype: 'q4' },
+            { id: 'onnx-community/Qwen2.5-0.5B-Instruct', label: 'Smartest', size: '~0.5B', note: 'Most nuanced · slower', dtype: 'q4' }
+        ];
         const gpuOK = () => typeof navigator !== 'undefined' && !!navigator.gpu;
-        let xfmr = { pipe: null, promise: null };
+        // Pick a sensible default for THIS device: phones / low-RAM / few cores get the
+        // lightest model so reactions feel instant; roomier machines get the balanced one.
+        function autoBrowserModel() {
+            const ua = navigator.userAgent || '';
+            const mobile = /Mobi|Android|iPhone|iPad|iPod/i.test(ua);
+            const mem = navigator.deviceMemory || (mobile ? 3 : 8);
+            const cores = navigator.hardwareConcurrency || (mobile ? 4 : 8);
+            if (mobile || mem <= 4 || cores <= 4) return BROWSER_MODELS[0].id;   // Fastest
+            return BROWSER_MODELS[1].id;                                          // Balanced
+        }
+        function browserModelId() {
+            if (!S.settings.browserModel || !BROWSER_MODELS.some(m => m.id === S.settings.browserModel)) {
+                S.settings.browserModel = autoBrowserModel(); S.save();
+            }
+            return S.settings.browserModel;
+        }
+        const browserModelMeta = id => BROWSER_MODELS.find(m => m.id === (id || browserModelId())) || BROWSER_MODELS[0];
+        let xfmr = { id: null, pipe: null, promise: null };
         function ensureXfmr() {
-            if (xfmr.pipe) return Promise.resolve(xfmr.pipe);
-            if (xfmr.promise) return xfmr.promise;
+            const id = browserModelId(), meta = browserModelMeta(id);
+            if (xfmr.pipe && xfmr.id === id) return Promise.resolve(xfmr.pipe);
+            if (xfmr.promise && xfmr.id === id) return xfmr.promise;
             if (!gpuOK()) return Promise.resolve(null);
             const dl = $('model-dl');
+            xfmr.id = id; xfmr.pipe = null;
             xfmr.promise = (async () => {
                 try {
-                    if (dl) { dl.style.display = 'flex'; dl.textContent = 'Loading on-device model…'; }
+                    if (dl) { dl.style.display = 'flex'; dl.textContent = `Loading ${meta.label} model…`; }
                     const { pipeline } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3');
-                    const pipe = await pipeline('text-generation', BROWSER_MODEL, {
-                        dtype: 'q4', device: 'webgpu',
-                        progress_callback: p => { if (dl && p && p.status === 'progress' && p.total) dl.textContent = `Downloading on-device model… ${Math.round(p.loaded / p.total * 100)}% (one-time)`; }
+                    const pipe = await pipeline('text-generation', id, {
+                        dtype: meta.dtype || 'q4', device: 'webgpu',
+                        progress_callback: p => { if (dl && p && p.status === 'progress' && p.total) dl.textContent = `Downloading ${meta.label} model (${meta.size})… ${Math.round(p.loaded / p.total * 100)}% · one-time`; }
                     });
                     xfmr.pipe = pipe; return pipe;
-                } catch (e) { console.warn('transformers.js load failed', e); xfmr.promise = null; toast('Could not load the on-device model.', 'bad'); return null; }
+                } catch (e) { console.warn('transformers.js load failed', e); xfmr.promise = null; xfmr.id = null; toast('Could not load the on-device model.', 'bad'); return null; }
                 finally { if (dl) dl.style.display = 'none'; }
             })();
             return xfmr.promise;
+        }
+        // Switch the active browser model: drop the old pipe so the new one loads,
+        // and (if browser mode is live) re-assess every option with the new brain.
+        function setBrowserModel(id) {
+            if (!BROWSER_MODELS.some(m => m.id === id) || id === S.settings.browserModel) return;
+            S.settings.browserModel = id; S.save();
+            xfmr = { id: null, pipe: null, promise: null };
+            if (S.settings.mode === 'browser') { toast(`Switched to the ${browserModelMeta(id).label} model — re-assessing…`, 'good'); autoRespondAll(true); }
+            else toast(`Browser model set to ${browserModelMeta(id).label}`, 'good');
         }
         // Lazy-load Puter only when cloud AI is actually used, so the default
         // experience stays dependency-free and nothing phones home unless chosen.
@@ -977,7 +1028,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             if (e.type === 'REACT') {
                 const o = findOpt(p.optionId); if (!o) return;
                 o.reactions[e.from] = p.r;
-                o.notes = o.notes || {}; o.notes[e.from] = { r: p.r, score: p.score || null, reason: p.reason || '' };
+                o.notes = o.notes || {}; o.notes[e.from] = { r: p.r, score: p.score || null, reason: p.reason || '', userComment: p.comment || '' };
                 refreshBoard(); return;
             }
             if (e.type === 'FINALIZE') {
@@ -1082,19 +1133,40 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
         }
 
         function capHistory() { const h = S.me.history || {}; const keys = Object.keys(h); if (keys.length > 600) keys.sort((a, b) => (h[a].ts || 0) - (h[b].ts || 0)).slice(0, keys.length - 600).forEach(k => delete h[k]); }
+        const reactWord = r => r === 'in' ? "I'm in" : r === 'ok' ? 'Meh' : r === 'no' ? 'Nope' : '';
         function setMyReaction(o, r, human, meta) {
+            const prevNote = (o.notes && o.notes[S.me.id]) || null;
+            // A human tap that disagrees with this diner's OWN AI call — flag it so the
+            // card can invite a quick "why" note. AI re-assessments clear the flag.
+            if (human) {
+                if (prevNote && isAIMode(prevNote.by) && prevNote.r && prevNote.r !== r) { o._correctedAI = true; o._aiCall = prevNote.r; o._focusNote = true; o._noteOpen = true; }
+            } else { o._correctedAI = false; o._aiCall = null; }
             o.reactions[S.me.id] = r;
             o.notes = o.notes || {};
+            const keepComment = (prevNote && prevNote.userComment) || '';   // never lose a memo already typed
             const note = meta ? { r, score: meta.score || null, reason: meta.reason || '', by: meta.by } : { r, by: 'you' };
+            note.userComment = keepComment;
             o.notes[S.me.id] = note;
             // Remember my decision for this restaurant so it carries across tables.
             S.me.history = S.me.history || {};
             const hk = o.name.toLowerCase(), prev = S.me.history[hk] || {};
-            S.me.history[hk] = { name: o.name, lat: o.lat, lon: o.lon, r, score: note.score || null, reason: note.reason || '', by: note.by, ts: now(), visits: prev.visits || 0, userComment: prev.userComment || '' };
+            S.me.history[hk] = { name: o.name, lat: o.lat, lon: o.lon, r, score: note.score || null, reason: note.reason || '', by: note.by, ts: now(), visits: prev.visits || 0, userComment: prev.userComment || keepComment };
             capHistory(); S.save();
-            Mesh.emit('REACT', { optionId: o.id, r, score: note.score, reason: note.reason });
+            Mesh.emit('REACT', { optionId: o.id, r, score: note.score, reason: note.reason, comment: note.userComment });
             refreshBoard();
             if (human) haptic();
+        }
+        // Save the optional "why?" memo without a full repaint, so typing keeps focus.
+        function saveMyComment(o, text, share) {
+            text = (text || '').slice(0, 140);
+            o.notes = o.notes || {};
+            const n = o.notes[S.me.id] || (o.notes[S.me.id] = { r: o.reactions[S.me.id], by: 'you' });
+            n.userComment = text;
+            if (text) o._correctedAI = false;   // they've answered the nudge
+            const hk = o.name.toLowerCase();
+            if (S.me.history && S.me.history[hk]) { S.me.history[hk].userComment = text; }
+            S.save();
+            if (share) Mesh.emit('REACT', { optionId: o.id, r: o.reactions[S.me.id], score: n.score || null, reason: n.reason || '', comment: text });
         }
         // Finalising is a deliberate, all-party act: the "Lock it in" button only
         // appears once EVERY live member is in, and any member may then seal it.
@@ -1345,6 +1417,12 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             return false;
         }
 
+        // One-shot entry fade: applied only to brand-new cards, then cleared on end
+        // so a later re-position can never restart it (which caused the flashing).
+        function playEnter(c) {
+            c.style.animation = 'fadeUp .45s var(--ease) both';
+            c.addEventListener('animationend', () => { c.style.animation = ''; }, { once: true });
+        }
         function renderBoard() {
             const board = $('board'), n = $('board-n');
             const list = displayOptions();
@@ -1363,13 +1441,18 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             if (orderChanged) cardEls.forEach((c, id) => { const r = c.getBoundingClientRect(); first[id] = { x: r.left, y: r.top }; });
             const leaderId = (rankedOptions()[0] || {}).id;
             const fresh = new Set();
-            list.forEach(o => {
+            // Drop stale cards first so the index-based positioning below is accurate.
+            [...cardEls.keys()].forEach(id => { if (!list.find(o => o.id === id)) { cardEls.get(id).remove(); cardEls.delete(id); } });
+            list.forEach((o, i) => {
                 let c = cardEls.get(o.id);
                 if (!c) { c = document.createElement('div'); c.className = 'opt'; c.dataset.id = o.id; c.innerHTML = cardSkeleton(o); wireCard(c); cardEls.set(o.id, c); fresh.add(c); }
                 paintCard(c, o, leaderId);   // granular: only changed regions touch the DOM
-                board.appendChild(c);
+                // Only move a card when its slot actually changed. Re-appending an
+                // already-placed node restarts its entry animation — that was the
+                // flash where cards vanished and faded back in after each reaction.
+                if (board.children[i] !== c) board.insertBefore(c, board.children[i] || null);
+                if (fresh.has(c)) playEnter(c);   // one-shot fade-in for brand-new cards only
             });
-            [...cardEls.keys()].forEach(id => { if (!list.find(o => o.id === id)) { cardEls.get(id).remove(); cardEls.delete(id); } });
             if (orderChanged) {
                 cardEls.forEach((c, id) => {
                     if (fresh.has(c)) return;
@@ -1421,7 +1504,8 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                     <div class="lockwrap"></div>
                 </div>
                 <div class="ai-note" hidden></div>
-                <div class="who-comment" hidden></div>`;
+                <div class="who-comment" hidden></div>
+                <div class="opt-note" hidden></div>`;
         }
         // Update a region ONLY when its content changed — no whole-card rebuild, no flash.
         function setRegion(elm, html) { if (elm && elm.dataset.h !== html) { elm.dataset.h = html; elm.innerHTML = html; return true; } return false; }
@@ -1465,7 +1549,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             setRegion(card.querySelector('.tally'), mem.map(m => {
                 const r = o.reactions[m.id], rc = r || 'pending';
                 const face = r === 'in' ? '😋' : r === 'ok' ? '🤔' : r === 'no' ? '🙅' : '⏳';
-                const note = notes[m.id], hasComment = note && note.reason;
+                const note = notes[m.id], hasComment = note && (note.reason || note.userComment);
                 const status = r ? ({ in: 'is in', ok: 'is unsure', no: 'said no' }[r]) : ((m.me && o._think) ? 'is thinking…' : 'is deciding…');
                 const tip = `${m.me ? 'You' : m.name} ${status}${hasComment ? ' · tap to read their note' : ''}`;
                 return `<span class="who ${rc}${hasComment ? ' has-note' : ''}${sel === m.id ? ' open' : ''}" data-mid="${m.id}" title="${esc(tip)}"><span class="fe">${esc(m.emoji)}</span>${face}</span>`;
@@ -1480,7 +1564,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             // a single member's comment, shown only when you tap their face
             const wc = card.querySelector('.who-comment');
             let wcHtml = '';
-            if (sel) { const m = mem.find(x => x.id === sel), note = notes[sel]; if (m) { const r = o.reactions[sel]; const st = r === 'in' ? "is in 😋" : r === 'ok' ? 'is unsure 🤔' : r === 'no' ? 'said no 🙅' : ((m.me && o._think) ? 'is thinking… 🧠' : 'is deciding…'); wcHtml = `<b>${esc(m.me ? 'You' : m.name)}</b> ${st}${note && note.reason ? ` — “${esc(note.reason)}”` : (r ? '' : '')}`; } }
+            if (sel) { const m = mem.find(x => x.id === sel), note = notes[sel]; if (m) { const r = o.reactions[sel]; const st = r === 'in' ? "is in 😋" : r === 'ok' ? 'is unsure 🤔' : r === 'no' ? 'said no 🙅' : ((m.me && o._think) ? 'is thinking… 🧠' : 'is deciding…'); const memo = note && note.userComment ? `<span class="wc-memo">📝 “${esc(note.userComment)}”</span>` : ''; wcHtml = `<b>${esc(m.me ? 'You' : m.name)}</b> ${st}${note && note.reason ? ` — “${esc(note.reason)}”` : (r ? '' : '')}${memo}`; } }
             if (setRegion(wc, wcHtml)) { wc.hidden = !wcHtml; if (wcHtml) { wc.style.animation = 'none'; void wc.offsetWidth; wc.style.animation = 'aiIn .3s var(--ease)'; } }
             // actions — toggle button classes instead of rebuilding, so pressing
             // a reaction never re-creates the buttons (no flash).
@@ -1493,6 +1577,38 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 if (react) react.querySelectorAll('.rb').forEach(b => b.classList.toggle('sel', b.dataset.r === my));
                 setRegion(card.querySelector('.lockwrap'), c.all ? `<button class="btn block lock-btn" data-lock="1" style="margin-top:11px;background:var(--green);box-shadow:0 10px 24px rgba(22,184,102,.32)"><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg> ${c.total > 1 ? "Everyone's in — lock it in" : 'Lock this in'}</button>` : '');
             }
+            paintNote(card, o, myNote);
+        }
+        // Optional "why?" memo: appears once you've personally reacted, and auto-opens
+        // (pre-focused) when your tap overrode your own AI — so jotting a reason is one
+        // tap away. Rebuilds only on a real state change, so typing never loses focus.
+        function paintNote(card, o, myNote) {
+            const region = card.querySelector('.opt-note'); if (!region) return;
+            const myComment = (myNote && myNote.userComment) || '';
+            const canNote = !o.won && !!(myNote && (myNote.by === 'you' || myComment));
+            const open = canNote && (o._noteOpen || !!myComment || !!o._correctedAI);
+            const state = !canNote ? 'hidden' : (open ? 'open' : 'toggle');
+            if (region.dataset.state !== state) {
+                region.dataset.state = state;
+                region.hidden = state === 'hidden';
+                if (state === 'hidden') { region.innerHTML = ''; }
+                else if (state === 'toggle') { region.innerHTML = `<button class="on-toggle" data-noteopen="1">📝 Add a note — why?</button>`; }
+                else {
+                    region.innerHTML = `<div class="on-hint" hidden></div><input class="on-i input" maxlength="140" placeholder="Add a quick note — why? (optional)" />`;
+                    const inp = region.querySelector('.on-i');
+                    inp.value = myComment;
+                    inp.oninput = () => saveMyComment(o, inp.value, false);                 // local save, keeps focus
+                    inp.onchange = () => saveMyComment(o, inp.value, true);                 // blur/Enter -> share with table
+                    inp.onkeydown = ev => { if (ev.key === 'Enter') inp.blur(); };
+                }
+            }
+            if (state === 'open') {
+                const inp = region.querySelector('.on-i');
+                if (inp && document.activeElement !== inp && inp.value !== myComment) inp.value = myComment;
+                const hint = region.querySelector('.on-hint');
+                if (hint) { const show = !!(o._correctedAI && o._aiCall); hint.hidden = !show; if (show) hint.textContent = `You overrode your AI’s “${reactWord(o._aiCall)}” — note why? (optional)`; }
+                if (o._focusNote && inp) { o._focusNote = false; setTimeout(() => { try { inp.focus(); } catch (_) {} }, 40); }
+            }
         }
         // Delegated handlers, set once on create — survive region re-renders.
         function wireCard(card) {
@@ -1500,6 +1616,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 const rb = e.target.closest('[data-r]');
                 if (rb) { const op = findOpt(card.dataset.id); if (op && !op.won) setMyReaction(op, rb.dataset.r, true); return; }
                 if (e.target.closest('[data-lock]')) { const op = findOpt(card.dataset.id); if (op) finalizeOption(op); return; }
+                if (e.target.closest('[data-noteopen]')) { const op = findOpt(card.dataset.id); if (op) { op._noteOpen = true; op._focusNote = true; paintCard(card, op, (rankedOptions()[0] || {}).id); haptic(); } return; }
                 const who = e.target.closest('.who[data-mid]');
                 if (who) { const id = card.dataset.id, mid = who.dataset.mid; revealed.set(id, revealed.get(id) === mid ? null : mid); const op = findOpt(id); if (op) paintCard(card, op, (rankedOptions()[0] || {}).id); haptic(); }
             };
@@ -1534,7 +1651,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             { key: 'manual', ico: '👆', t: "I'll tap myself", d: 'Review each option and react when you want.' },
             { key: 'taste', ico: '⚡', t: 'Auto from my taste', d: 'React instantly from your preferences — no AI, works on any phone.' },
             { key: 'ai', ico: '🧠', t: 'Auto with on-device AI', d: 'Smarter, nuanced reactions. Stays private on your device.', need: 'ai' },
-            { key: 'browser', ico: '🤖', t: 'Auto with a browser model', d: 'Runs a small open model in your browser (WebGPU). Private & offline after a one-time download (~hundreds of MB).', need: 'gpu' },
+            { key: 'browser', ico: '🤖', t: 'Auto with a browser model', d: 'Runs a small open model in your browser (WebGPU). Private & offline. A light, fast model is auto-picked for your device — change the size below.', need: 'gpu' },
             { key: 'cloud', ico: '☁️', t: 'Auto with cloud AI', d: 'Smart reactions via a free online service — works on any phone. Sends your picks to that service.' }
         ];
         const isAIMode = m => m === 'ai' || m === 'cloud' || m === 'browser';
@@ -1560,19 +1677,38 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 haptic();
             };
         }
+        // Sub-picker for the on-device model size — only relevant under "browser" mode.
+        function modelPickHtml() {
+            const cur = browserModelId();
+            return `<div class="field-label">On-device model <span style="text-transform:none;letter-spacing:0;color:var(--muted);font-weight:600">· auto-picked for your device</span></div>
+                <div class="modelseg" id="model-seg">${BROWSER_MODELS.map(m => `<button class="modelopt ${cur === m.id ? 'on' : ''}" data-mid="${esc(m.id)}"><b>${m.label}</b><span>${m.size}</span><small>${m.note}</small></button>`).join('')}</div>
+                <div class="chip-hint">Smaller models react faster and download quicker — best on phones. Larger ones are more thoughtful but slower. Your pick is remembered on this device.</div>`;
+        }
+        function renderModelPick() {
+            const host = $('model-pick'); if (!host) return;
+            const show = S.settings.mode === 'browser' && gpuOK();
+            host.style.display = show ? '' : 'none';
+            host.innerHTML = show ? modelPickHtml() : '';
+        }
         function syncSettingsSheet() {
             $('set-name').value = S.me.name;
             $('set-emoji').textContent = S.me.emoji;
             $('set-emoji-row').style.display = 'none';
             $('set-emoji-row').innerHTML = AVATARS.map(a => `<button class="emoji-pick ${a === S.me.emoji ? 'on' : ''}" data-e="${a}">${a}</button>`).join('');
             wireModePick($('mode-pick'), () => S.settings.mode, m => {
-                const prev = S.settings.mode; S.settings.mode = m; S.save(); renderApp();
+                const prev = S.settings.mode; S.settings.mode = m; S.save(); renderApp(); renderModelPick();
                 if (m !== 'manual' && prev !== m) {
-                    if (S.options.length) toast(m === 'ai' || m === 'cloud' ? 'Re-assessing every option with AI…' : 'Re-rating every option from your taste…');
+                    if (S.options.length) toast(m === 'ai' || m === 'cloud' || m === 'browser' ? 'Re-assessing every option with AI…' : 'Re-rating every option from your taste…');
                     autoRespondAll(true); // re-assess all with the new brain
                 }
             });
+            renderModelPick();
         }
+        // Delegated once — picking a model size persists it and reloads the brain.
+        $('model-pick').onclick = e => {
+            const b = e.target.closest('[data-mid]'); if (!b) return;
+            setBrowserModel(b.dataset.mid); renderModelPick(); haptic();
+        };
         // name + avatar editing (broadcasts so peers see the change live)
         $('set-name').oninput = e => { S.me.name = e.target.value; };
         $('set-name').onchange = () => { if (!S.me.name.trim()) S.me.name = 'Guest ' + uid(2); S.save(); broadcastPrefs(); renderApp(); $('set-name').value = S.me.name; toast('Name updated', 'good'); };
