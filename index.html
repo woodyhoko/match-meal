@@ -374,6 +374,8 @@
         .ai-note .thinking .dots i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: blink 1s infinite; }
         .ai-note .thinking .dots i:nth-child(2) { animation-delay: .2s }
         .ai-note .thinking .dots i:nth-child(3) { animation-delay: .4s }
+        /* live streaming caret — blinks while the AI comment is being written */
+        .ai-note .sc { display: inline-block; width: 2px; height: 1em; margin-left: 1px; vertical-align: -2px; background: var(--accent); border-radius: 1px; animation: blink .85s steps(1) infinite; }
         /* equal-height cards (per row in the desktop grid); the consensus bar
            sits right after the tally so its position doesn't depend on the
            length of the AI comment, which now lives below the actions. */
@@ -712,8 +714,8 @@
                 return `You react on behalf of a diner to a restaurant suggestion. Reply ONLY as JSON.
 Diner loves: ${p.loves.join(', ') || 'anything'}. Avoids: ${p.avoids.join(', ') || 'nothing'}. Diet: ${p.diet.join(', ') || 'none'}. Budget up to ${p.budget}.${p.custom ? '\nExtra preferences (honour these): ' + p.custom : ''}
 Suggestion: "${option.name}" (${option.cuisine || 'unknown'}), ${option.dist}m away.
-Rate how good a fit this place is for THIS diner from 1 (poor) to 5 (great). Set "r" to EXACTLY ONE of these words: in (happy to go), ok (fine, minor worry), or no (won't go). "score" is an integer 1-5. "reason" is one short sentence.
-Reply with ONE JSON object and nothing else, e.g. {"r":"in","score":4,"reason":"close by and I love ramen"}`;
+Rate how good a fit this place is for THIS diner from 1 (poor) to 5 (great). "reason" is one short, friendly first-person sentence (write this first). Set "r" to EXACTLY ONE of these words: in (happy to go), ok (fine, minor worry), or no (won't go). "score" is an integer 1-5.
+Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason":"close by and I love ramen","r":"in","score":4}`;
             },
             parseReact(text) {
                 try {
@@ -726,19 +728,39 @@ Reply with ONE JSON object and nothing else, e.g. {"r":"in","score":4,"reason":"
                 return null;
             },
             // On-device (Chrome built-in Prompt API)
-            async react(option) {
-                const schema = { type: 'object', properties: { r: { type: 'string', enum: ['in', 'ok', 'no'] }, score: { type: 'number' }, reason: { type: 'string' } }, required: ['r'] };
+            async react(option, onText) {
+                const schema = { type: 'object', properties: { reason: { type: 'string' }, r: { type: 'string', enum: ['in', 'ok', 'no'] }, score: { type: 'number' } }, required: ['r'] };
                 try {
                     const s = await window.LanguageModel.create();
-                    let raw;
-                    try { raw = await s.prompt(this.reactPrompt(option), { responseConstraint: schema }); } finally { s.destroy(); }
+                    let raw = '';
+                    try {
+                        if (onText && typeof s.promptStreaming === 'function') {
+                            const stream = s.promptStreaming(this.reactPrompt(option), { responseConstraint: schema });
+                            for await (const chunk of stream) { raw = mergeChunk(raw, chunk); onText(streamingReason(raw)); }
+                        } else {
+                            raw = await s.prompt(this.reactPrompt(option), { responseConstraint: schema });
+                        }
+                    } finally { s.destroy(); }
                     return this.parseReact(raw);
                 } catch (e) { console.warn('AI react failed', e); return null; }
             },
             // Keyless online fallback (Puter.js — free, no API key, works on any browser).
-            async cloudReact(option) {
+            async cloudReact(option, onText) {
                 if (!(await ensurePuter())) return null;
                 try {
+                    if (onText) {
+                        const run = (async () => {
+                            let raw = '';
+                            const resp = await puter.ai.chat(this.reactPrompt(option), { stream: true });
+                            for await (const part of resp) {
+                                const d = (part && (part.text || part.delta || (part.message && part.message.content))) || '';
+                                if (d) { raw = mergeChunk(raw, d); onText(streamingReason(raw)); }
+                            }
+                            return raw;
+                        })();
+                        const raw = await Promise.race([run, new Promise((_, rej) => setTimeout(() => rej(new Error('cloud timeout')), 20000))]);
+                        return this.parseReact(raw);
+                    }
                     const r = await Promise.race([
                         puter.ai.chat(this.reactPrompt(option)),
                         new Promise((_, rej) => setTimeout(() => rej(new Error('cloud timeout')), 12000))
@@ -750,14 +772,22 @@ Reply with ONE JSON object and nothing else, e.g. {"r":"in","score":4,"reason":"
             // A small open model running fully in the browser via transformers.js + WebGPU.
             // Private (stays on device) and works beyond Chrome's built-in AI, at the cost
             // of a one-time model download. Lazy-loaded only when this mode is used.
-            async browserReact(option) {
+            async browserReact(option, onText) {
                 const pipe = await ensureXfmr();
                 if (!pipe) return null;
                 try {
+                    let streamer = null;
+                    if (onText) {
+                        try {
+                            const { TextStreamer } = await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3');
+                            let raw = '';
+                            streamer = new TextStreamer(pipe.tokenizer, { skip_prompt: true, skip_special_tokens: true, callback_function: t => { raw = mergeChunk(raw, t); onText(streamingReason(raw)); } });
+                        } catch (_) { streamer = null; }
+                    }
                     const out = await pipe([
                         { role: 'system', content: 'You react for a diner about a restaurant. Reply ONLY with the JSON, nothing else.' },
                         { role: 'user', content: this.reactPrompt(option) }
-                    ], { max_new_tokens: 96, do_sample: false });
+                    ], { max_new_tokens: 96, do_sample: false, streamer });
                     const msg = out && out[0] && out[0].generated_text;
                     const text = Array.isArray(msg) ? (msg[msg.length - 1].content || '') : (typeof msg === 'string' ? msg : '');
                     return this.parseReact(text);
@@ -802,6 +832,32 @@ Reply with ONE JSON object and nothing else, e.g. {"r":"in","score":4,"reason":"
                 setTimeout(() => res(typeof puter !== 'undefined'), 8000); // never hang the loop
             });
             return puterPromise;
+        }
+        // Streaming helpers. Different backends yield either cumulative snapshots
+        // or incremental deltas — normalise both into one growing buffer.
+        function mergeChunk(buf, chunk) {
+            if (chunk == null) return buf;
+            if (typeof chunk !== 'string') chunk = String(chunk);
+            if (!buf) return chunk;
+            if (chunk.length >= buf.length && chunk.startsWith(buf)) return chunk; // cumulative
+            return buf + chunk;                                                     // delta
+        }
+        // Pull the (possibly incomplete) "reason" string out of a half-written JSON
+        // object so the comment can be shown growing token-by-token.
+        function streamingReason(t) {
+            if (!t) return '';
+            const k = t.indexOf('"reason"'); if (k < 0) return '';
+            let i = t.indexOf(':', k); if (i < 0) return '';
+            i = t.indexOf('"', i); if (i < 0) return '';
+            let out = '', esc = false;
+            for (let j = i + 1; j < t.length; j++) {
+                const c = t[j];
+                if (esc) { out += (c === 'n' ? ' ' : c); esc = false; }
+                else if (c === '\\') esc = true;
+                else if (c === '"') return out;   // closed — reason complete
+                else out += c;
+            }
+            return out;                            // still streaming
         }
         function extractJson(t) {
             if (!t) return '{}';
@@ -922,7 +978,7 @@ Reply with ONE JSON object and nothing else, e.g. {"r":"in","score":4,"reason":"
                 const o = findOpt(p.optionId); if (!o) return;
                 o.reactions[e.from] = p.r;
                 o.notes = o.notes || {}; o.notes[e.from] = { r: p.r, score: p.score || null, reason: p.reason || '' };
-                renderApp(); return;
+                refreshBoard(); return;
             }
             if (e.type === 'FINALIZE') {
                 const o = findOpt(p.optionId); if (!o || o.won) return;
@@ -1014,9 +1070,11 @@ Reply with ONE JSON object and nothing else, e.g. {"r":"in","score":4,"reason":"
                     // If I've decided on this exact place before, reuse that decision directly.
                     if (!force) { const past = (S.me.history || {})[o.name.toLowerCase()]; if (past) { setMyReaction(o, past.r, false, { score: past.score || null, reason: (past.reason || 'as before') + ' · remembered', by: past.by || 'history' }); continue; } }
                     let v = null, byAI = false;
-                    if (S.settings.mode === 'ai' && AI.available) { o._think = true; renderApp(); v = await AI.react(o); o._think = false; byAI = !!v; }
-                    else if (S.settings.mode === 'cloud') { o._think = true; renderApp(); v = await AI.cloudReact(o); o._think = false; byAI = !!v; }
-                    else if (S.settings.mode === 'browser') { o._think = true; renderApp(); v = await AI.browserReact(o); o._think = false; byAI = !!v; }
+                    const onTok = txt => streamNote(o, txt);   // live comment into just this card
+                    if (S.settings.mode === 'ai' && AI.available) { o._think = true; paintOne(o); v = await AI.react(o, onTok); byAI = !!v; }
+                    else if (S.settings.mode === 'cloud') { o._think = true; paintOne(o); v = await AI.cloudReact(o, onTok); byAI = !!v; }
+                    else if (S.settings.mode === 'browser') { o._think = true; paintOne(o); v = await AI.browserReact(o, onTok); byAI = !!v; }
+                    o._think = false; o._stream = null;        // clear transient state before the final paint
                     if (!v) v = smartReact(o);
                     setMyReaction(o, v.r, false, { score: v.score || null, reason: v.reason || '', by: byAI ? S.settings.mode : 'taste' });
                 }
@@ -1035,7 +1093,7 @@ Reply with ONE JSON object and nothing else, e.g. {"r":"in","score":4,"reason":"
             S.me.history[hk] = { name: o.name, lat: o.lat, lon: o.lon, r, score: note.score || null, reason: note.reason || '', by: note.by, ts: now(), visits: prev.visits || 0, userComment: prev.userComment || '' };
             capHistory(); S.save();
             Mesh.emit('REACT', { optionId: o.id, r, score: note.score, reason: note.reason });
-            renderApp();
+            refreshBoard();
             if (human) haptic();
         }
         // Finalising is a deliberate, all-party act: the "Lock it in" button only
@@ -1367,6 +1425,23 @@ Reply with ONE JSON object and nothing else, e.g. {"r":"in","score":4,"reason":"
         }
         // Update a region ONLY when its content changed — no whole-card rebuild, no flash.
         function setRegion(elm, html) { if (elm && elm.dataset.h !== html) { elm.dataset.h = html; elm.innerHTML = html; return true; } return false; }
+        // Reactions only change the board — skip the topbar/members/find-bar repaint
+        // that a full renderApp() would do, so siblings never flash.
+        function refreshBoard() { if (!$('app-root')) { renderApp(); return; } renderBoard(); updateLead(); }
+        // Repaint a single card in place (used while one option is being assessed).
+        function paintOne(o) { const card = cardEls.get(o.id); if (card) paintCard(card, o, (rankedOptions()[0] || {}).id); else refreshBoard(); }
+        // Write the AI comment as it streams, touching ONLY this card's note region —
+        // no board pass, no sibling reflow, no per-token fade re-trigger.
+        function streamNote(o, partial) {
+            o._stream = partial || '';
+            const card = cardEls.get(o.id); if (!card) return;
+            const noteEl = card.querySelector('.ai-note'); if (!noteEl) return;
+            const html = partial
+                ? `🧠 Your AI: “${esc(partial)}<span class="sc"></span>”`
+                : `<span class="thinking">🧠 thinking<span class="dots"><i></i><i></i><i></i></span></span>`;
+            if (noteEl.dataset.h !== html) { noteEl.dataset.h = html; noteEl.innerHTML = html; }
+            if (noteEl.hidden) noteEl.hidden = false;
+        }
         function paintCard(card, o, leaderId) {
             const c = consensusState(o), mem = liveMembers(), notes = o.notes || {};
             const isTop = !o.won && o.id === leaderId && c.total > 1;
@@ -1379,9 +1454,12 @@ Reply with ONE JSON object and nothing else, e.g. {"r":"in","score":4,"reason":"
             // my AI comment / thinking — gentle fade-in when it lands
             const myNote = notes[S.me.id], noteEl = card.querySelector('.ai-note');
             let noteHtml = '';
-            if (o._think) noteHtml = `<span class="thinking">🧠 thinking<span class="dots"><i></i><i></i><i></i></span></span>`;
+            const streaming = o._stream != null;
+            if (streaming && o._stream) noteHtml = `🧠 Your AI: “${esc(o._stream)}<span class="sc"></span>”`;
+            else if (o._think || streaming) noteHtml = `<span class="thinking">🧠 thinking<span class="dots"><i></i><i></i><i></i></span></span>`;
             else if (myNote && myNote.reason && isAIMode(myNote.by)) noteHtml = `🧠 Your AI: “${esc(myNote.reason)}”`;
-            if (setRegion(noteEl, noteHtml)) { noteEl.hidden = !noteHtml; if (noteHtml && !o._think) { noteEl.style.animation = 'none'; void noteEl.offsetWidth; noteEl.style.animation = 'aiIn .42s var(--ease)'; } }
+            // Never re-trigger the fade-in while thinking/streaming — only when the final comment lands.
+            if (setRegion(noteEl, noteHtml)) { noteEl.hidden = !noteHtml; if (noteHtml && !o._think && !streaming) { noteEl.style.animation = 'none'; void noteEl.offsetWidth; noteEl.style.animation = 'aiIn .42s var(--ease)'; } }
             // tally — tap a face to see that person's take; hover shows their status.
             const sel = revealed.get(o.id);
             setRegion(card.querySelector('.tally'), mem.map(m => {
