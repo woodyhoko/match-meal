@@ -685,6 +685,15 @@
                     // only auto-rejoin a recent table (last 12h)
                     if (lt && (now() - (lt.ts || 0) < 12 * 3600e3)) this.lastTable = lt;
                     this.onboarded = localStorage.getItem('mm2_onb') === '1';
+                    // Restore the table I'm refreshing back into: same options + cards,
+                    // last-known members (offline until the mesh reconnects them).
+                    const urlT = new URLSearchParams(location.search).get('t');
+                    const target = urlT || (this.lastTable && this.lastTable.id) || this.me.id;
+                    const tbl = JSON.parse(localStorage.getItem('mm2_table') || 'null');
+                    if (tbl && tbl.table === target && (now() - (tbl.ts || 0) < 12 * 3600e3)) {
+                        this.options = (tbl.options || []).map(o => ({ ...o, reactions: o.reactions || {}, notes: o.notes || {} }));
+                        (tbl.members || []).forEach(m => { if (m.id && m.id !== this.me.id && !this.members.has(m.id)) this.members.set(m.id, { ...m, online: false }); });
+                    }
                 } catch (_) {}
                 if (!this.me.name) this.me.name = '';
             },
@@ -694,6 +703,20 @@
                 if (this.loc) localStorage.setItem('mm2_loc', JSON.stringify(this.loc));
                 if (this.lastTable) localStorage.setItem('mm2_lasttable', JSON.stringify(this.lastTable));
                 localStorage.setItem('mm2_onb', this.onboarded ? '1' : '0');
+                this.saveTable();
+            },
+            // Persist the live table (its options + reactions + who's at it) so a page
+            // refresh drops you back into the same table with the same cards.
+            saveTable() {
+                try {
+                    localStorage.setItem('mm2_table', JSON.stringify({
+                        table: currentTableId(), ts: now(),
+                        options: this.options.map(serOpt),
+                        // keep ALL known members (even momentarily offline) so the table
+                        // roster survives a refresh and they reappear when reconnected
+                        members: [...this.members.values()].map(m => ({ id: m.id, name: m.name, emoji: m.emoji, prefs: m.prefs || null }))
+                    }));
+                } catch (_) {}
             },
             myPrefs() { const m = this.me; return { name: m.name, emoji: m.emoji, loves: m.loves, avoids: m.avoids, diet: m.diet, budget: m.budget, radius: m.radius, custom: m.custom || '' }; }
         };
@@ -1019,17 +1042,17 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             if (e.type === 'SYNC') {
                 (p.members || []).forEach(m => { if (m.id !== S.me.id && !S.members.has(m.id)) S.members.set(m.id, { ...m, online: true }); else if (S.members.get(m.id)) { const x = S.members.get(m.id); x.prefs = x.prefs || m.prefs; } });
                 (p.options || []).forEach(o => { if (!findOpt(o.id)) S.options.push({ ...o, reactions: o.reactions || {}, notes: o.notes || {} }); });
-                renderApp(); autoRespondAll(); return;
+                S.save(); renderApp(); autoRespondAll(); return;
             }
             if (e.type === 'PROPOSE') {
                 (p.options || []).forEach(o => { if (!findOpt(o.id)) S.options.push({ ...o, reactions: o.reactions || {}, notes: o.notes || {} }); });
-                renderApp(); autoRespondAll(); return;
+                S.save(); renderApp(); autoRespondAll(); return;
             }
             if (e.type === 'REACT') {
                 const o = findOpt(p.optionId); if (!o) return;
                 o.reactions[e.from] = p.r;
                 o.notes = o.notes || {}; o.notes[e.from] = { r: p.r, score: p.score || null, reason: p.reason || '', userComment: p.comment || '' };
-                refreshBoard(); return;
+                S.saveTable(); refreshBoard(); return;
             }
             if (e.type === 'FINALIZE') {
                 const o = findOpt(p.optionId); if (!o || o.won) return;
@@ -1089,6 +1112,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                     address: c.address, by: S.me.id, byName: S.me.name, pitch: pitchFor(c, agg), reactions: {}, won: false
                 }));
                 S.options.push(...batch);
+                S.save();
                 const km = (Math.max(agg.radius, 1200) / 1000);
                 lastSearchMsg = `Added ${batch.length} spot${batch.length === 1 ? '' : 's'} within ${km % 1 ? km.toFixed(1) : km} km of ${S.loc.label}, best match on top.`;
                 Mesh.emit('PROPOSE', { options: batch.map(serOpt) });
@@ -1544,23 +1568,15 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             else if (myNote && myNote.reason && isAIMode(myNote.by)) noteHtml = `🧠 Your AI: “${esc(myNote.reason)}”`;
             // Never re-trigger the fade-in while thinking/streaming — only when the final comment lands.
             if (setRegion(noteEl, noteHtml)) { noteEl.hidden = !noteHtml; if (noteHtml && !o._think && !streaming) { noteEl.style.animation = 'none'; void noteEl.offsetWidth; noteEl.style.animation = 'aiIn .42s var(--ease)'; } }
-            // tally — tap a face to see that person's take; hover shows their status.
+            // tally — tap a face to see that person's take; updated face-by-face in
+            // place so reacting never destroys/recreates the row (no flicker).
             const sel = revealed.get(o.id);
-            setRegion(card.querySelector('.tally'), mem.map(m => {
-                const r = o.reactions[m.id], rc = r || 'pending';
-                const face = r === 'in' ? '😋' : r === 'ok' ? '🤔' : r === 'no' ? '🙅' : '⏳';
-                const note = notes[m.id], hasComment = note && (note.reason || note.userComment);
-                const status = r ? ({ in: 'is in', ok: 'is unsure', no: 'said no' }[r]) : ((m.me && o._think) ? 'is thinking…' : 'is deciding…');
-                const tip = `${m.me ? 'You' : m.name} ${status}${hasComment ? ' · tap to read their note' : ''}`;
-                return `<span class="who ${rc}${hasComment ? ' has-note' : ''}${sel === m.id ? ' open' : ''}" data-mid="${m.id}" title="${esc(tip)}"><span class="fe">${esc(m.emoji)}</span>${face}</span>`;
-            }).join(''));
-            // consensus
+            paintTally(card.querySelector('.tally'), o, mem, notes, sel);
+            // consensus — updated in place so the fill width animates smoothly instead
+            // of jumping (the CSS width transition only runs if the <i> persists).
             const consEl = card.querySelector('.consensus');
             consEl.hidden = !!o.won;
-            if (!o.won) {
-                const pct = c.total ? Math.round(c.ins / c.total * 100) : 0, blocked = c.nos > 0;
-                setRegion(consEl, `<div class="cbar ${blocked ? 'blocked' : ''}"><i style="width:${blocked ? 100 : pct}%"></i></div><div class="clabel">${blocked ? `<b>${c.nos}</b> not keen — needs everyone in` : (c.ins === c.total ? "everyone's in!" : `<b>${c.ins}/${c.total}</b> in · ${c.reacted < c.total ? (c.total - c.reacted) + ' to go' : 'needs everyone'}`)}</div>`);
-            }
+            if (!o.won) paintConsensus(consEl, c);
             // a single member's comment, shown only when you tap their face
             const wc = card.querySelector('.who-comment');
             let wcHtml = '';
@@ -1609,6 +1625,44 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 if (hint) { const show = !!(o._correctedAI && o._aiCall); hint.hidden = !show; if (show) hint.textContent = `You overrode your AI’s “${reactWord(o._aiCall)}” — note why? (optional)`; }
                 if (o._focusNote && inp) { o._focusNote = false; setTimeout(() => { try { inp.focus(); } catch (_) {} }, 40); }
             }
+        }
+        // Reconcile the tally faces in place: reuse each member's chip and touch only
+        // the parts that changed, so reacting never wipes/rebuilds the row (no flicker).
+        function paintTally(tallyEl, o, mem, notes, sel) {
+            const have = {};
+            [...tallyEl.children].forEach(ch => { have[ch.dataset.mid] = ch; });
+            mem.forEach((m, i) => {
+                const r = o.reactions[m.id], rc = r || 'pending';
+                const face = r === 'in' ? '😋' : r === 'ok' ? '🤔' : r === 'no' ? '🙅' : '⏳';
+                const note = notes[m.id], hasComment = note && (note.reason || note.userComment);
+                const status = r ? ({ in: 'is in', ok: 'is unsure', no: 'said no' }[r]) : ((m.me && o._think) ? 'is thinking…' : 'is deciding…');
+                const tip = `${m.me ? 'You' : m.name} ${status}${hasComment ? ' · tap to read their note' : ''}`;
+                const cls = `who ${rc}${hasComment ? ' has-note' : ''}${sel === m.id ? ' open' : ''}`;
+                let span = have[m.id];
+                if (!span) { span = document.createElement('span'); span.dataset.mid = m.id; span.innerHTML = `<span class="fe"></span><span class="fc"></span>`; }
+                else delete have[m.id];
+                if (tallyEl.children[i] !== span) tallyEl.insertBefore(span, tallyEl.children[i] || null);
+                if (span.className !== cls) span.className = cls;
+                if (span.title !== tip) span.title = tip;
+                const fe = span.firstChild; if (fe.textContent !== m.emoji) fe.textContent = m.emoji;
+                const fc = span.lastChild; if (fc.textContent !== face) fc.textContent = face;
+            });
+            Object.values(have).forEach(ch => ch.remove());   // drop chips for members who left
+        }
+        // Update the consensus bar in place — keep the same fill <i> so its CSS width
+        // transition actually runs (smooth glide instead of a sudden jump).
+        function paintConsensus(consEl, c) {
+            const pct = c.total ? Math.round(c.ins / c.total * 100) : 0, blocked = c.nos > 0;
+            let bar = consEl.firstElementChild, fill = bar && bar.firstElementChild, label = consEl.lastElementChild;
+            if (!bar || !bar.classList.contains('cbar')) {
+                consEl.innerHTML = `<div class="cbar"><i></i></div><div class="clabel"></div>`;
+                bar = consEl.firstElementChild; fill = bar.firstElementChild; label = consEl.lastElementChild;
+            }
+            bar.classList.toggle('blocked', blocked);
+            const w = (blocked ? 100 : pct) + '%';
+            if (fill.style.width !== w) fill.style.width = w;
+            const labelHtml = blocked ? `<b>${c.nos}</b> not keen — needs everyone in` : (c.ins === c.total ? "everyone's in!" : `<b>${c.ins}/${c.total}</b> in · ${c.reacted < c.total ? (c.total - c.reacted) + ' to go' : 'needs everyone'}`);
+            if (label.dataset.h !== labelHtml) { label.dataset.h = labelHtml; label.innerHTML = labelHtml; }
         }
         // Delegated handlers, set once on create — survive region re-renders.
         function wireCard(card) {
@@ -1716,7 +1770,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
         $('set-emoji-row').onclick = e => { const b = e.target.closest('[data-e]'); if (!b) return; S.me.emoji = b.dataset.e; $('set-emoji').textContent = S.me.emoji; $('set-emoji-row').querySelectorAll('.emoji-pick').forEach(x => x.classList.toggle('on', x === b)); $('set-emoji-row').style.display = 'none'; S.save(); broadcastPrefs(); renderApp(); haptic(); };
         $('who-here').onclick = () => { closeSheets(); openMembers(); };
         $('saved-prefs').onclick = () => { closeSheets(); openSaved(); };
-        $('leave-table').onclick = () => { if (confirm('Start a brand-new empty table? Current options will clear for you.')) { S.options = []; cardEls.clear(); $('board').innerHTML = ''; renderApp(); closeSheets(); } };
+        $('leave-table').onclick = () => { if (confirm('Start a brand-new empty table? Current options will clear for you.')) { S.options = []; S.members.clear(); S.tableHost = null; S.lastTable = null; cardEls.clear(); $('board').innerHTML = ''; try { localStorage.removeItem('mm2_lasttable'); } catch (_) {} S.save(); renderApp(); closeSheets(); } };
         $('edit-taste').onclick = () => { closeSheets(); openTaste(); };
 
         // who's at the table
