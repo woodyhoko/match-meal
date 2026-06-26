@@ -542,8 +542,11 @@
         .sheet-back:active { transform: scale(.9); }
         .sheet-back .ic { width: 20px; height: 20px; }
         .sheet.has-back .sheet-back { display: grid; }
-        .sheet.has-back h3 { padding-right: 40px; }
-        @media (max-width: 899px) { .sheet.has-back h3 { padding-left: 44px; min-height: 34px; } }
+        /* Keep the title clear of the Back button (and the desktop ✕) on all widths. */
+        .sheet.has-back h3 { padding-left: 46px; min-height: 34px; display: flex; align-items: center; }
+        /* Lock the page behind an open sheet so the list can't scroll underneath it.
+           overflow:hidden clamps the document scroll; the sheet keeps its own scroll. */
+        html.sheet-lock, html.sheet-lock body { overflow: hidden; }
 
         /* ---------------- Elegant confirm dialog (replaces the browser alert) ---------------- */
         #dialog { position: fixed; inset: 0; z-index: 96; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(20,12,7,.5); backdrop-filter: blur(5px); }
@@ -592,6 +595,9 @@
         <button class="sheet-x" aria-label="Close">✕</button>
         <h3>Your settings</h3>
         <p class="sub">Everything stays on your device.</p>
+        <div class="field-label">Table name</div>
+        <input class="input" id="set-tablename" maxlength="40" placeholder="Name this table" style="margin-bottom:6px" />
+        <div class="chip-hint" style="margin-bottom:16px">Shared with everyone at the table — anyone can change it.</div>
         <div class="field-label">Your name & avatar</div>
         <div class="row" style="margin-bottom:8px">
             <input class="input" id="set-name" maxlength="20" placeholder="Your name" style="flex:2" />
@@ -641,7 +647,7 @@
         <div class="grab"></div>
         <button class="sheet-x" aria-label="Close">✕</button>
         <h3>Past tables</h3>
-        <p class="sub">Tables you've been part of, and what got locked in. Tap to rejoin if it's still going.</p>
+        <p class="sub">Every table you've hosted or joined. Rejoin if it's still going — if it's wrapped up, we'll let you know.</p>
         <div id="tables-list"></div>
     </div>
 
@@ -737,7 +743,9 @@
             settings: { mode: 'taste' }, // 'manual' | 'taste' | 'ai'
             loc: null,                 // {lat, lon, label}
             onboarded: false,
-            tableHost: null,           // host id we joined (null if I'm host)
+            tableHost: null,           // host PEER id we joined (null if I'm host) — used to connect
+            tableId: null,             // unique table identity (differs from the peer id)
+            tableName: null,           // friendly, editable table name shared with everyone
             lastTable: null,           // {id, ts} — auto-rejoined on refresh
             // runtime
             members: new Map(),        // id -> {id,name,emoji,prefs,online}
@@ -754,14 +762,23 @@
                     // only auto-rejoin a recent table (last 12h)
                     if (lt && (now() - (lt.ts || 0) < 12 * 3600e3)) this.lastTable = lt;
                     this.onboarded = localStorage.getItem('mm2_onb') === '1';
+                    // restore the current table's identity (id + name + host peer)
+                    const meta = JSON.parse(localStorage.getItem('mm2_meta') || 'null');
+                    if (meta) { this.tableId = meta.id || null; this.tableName = meta.name || null; this.tableHost = meta.host || null; }
                     // Restore the table I'm refreshing back into: same options + cards,
                     // last-known members (offline until the mesh reconnects them).
                     const urlT = new URLSearchParams(location.search).get('t');
-                    const target = urlT || (this.lastTable && this.lastTable.id) || this.me.id;
-                    const tbl = JSON.parse(localStorage.getItem('mm2_table') || 'null');
-                    if (tbl && tbl.table === target && (now() - (tbl.ts || 0) < 12 * 3600e3)) {
-                        this.options = (tbl.options || []).map(o => ({ ...o, reactions: o.reactions || {}, notes: o.notes || {} }));
-                        (tbl.members || []).forEach(m => { if (m.id && m.id !== this.me.id && !this.members.has(m.id)) this.members.set(m.id, { ...m, online: false }); });
+                    if (urlT && urlT !== (this.tableHost || this.me.id)) {
+                        // Opening a DIFFERENT host's link than the one saved — that's a fresh
+                        // join, so drop the old table; its id/name arrive via SYNC.
+                        this.tableHost = urlT; this.tableId = null; this.tableName = null;
+                    } else {
+                        const target = this.tableId || this.tableHost || this.me.id;
+                        const tbl = JSON.parse(localStorage.getItem('mm2_table') || 'null');
+                        if (tbl && tbl.table === target && (now() - (tbl.ts || 0) < 12 * 3600e3)) {
+                            this.options = (tbl.options || []).map(o => ({ ...o, reactions: o.reactions || {}, notes: o.notes || {} }));
+                            (tbl.members || []).forEach(m => { if (m.id && m.id !== this.me.id && !this.members.has(m.id)) this.members.set(m.id, { ...m, online: false }); });
+                        }
                     }
                 } catch (_) {}
                 if (!this.me.name) this.me.name = '';
@@ -772,6 +789,7 @@
                 if (this.loc) localStorage.setItem('mm2_loc', JSON.stringify(this.loc));
                 if (this.lastTable) localStorage.setItem('mm2_lasttable', JSON.stringify(this.lastTable));
                 localStorage.setItem('mm2_onb', this.onboarded ? '1' : '0');
+                localStorage.setItem('mm2_meta', JSON.stringify({ id: this.tableId, name: this.tableName, host: this.tableHost }));
                 this.saveTable();
             },
             // Persist the live table (its options + reactions + who's at it) so a page
@@ -1063,7 +1081,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                     this.peer.on('error', e => {
                         console.warn('peer err', e.type);
                         if (e.type === 'unavailable-id') { localStorage.removeItem('mm2_peerid'); this.peer.destroy(); this.start().then(res); } // id taken (another tab) — get a fresh one
-                        else if (e.type === 'peer-unavailable') toast('That table is offline or the link is old.', 'bad');
+                        else if (e.type === 'peer-unavailable') toast('That table has wrapped up — ask them to share a fresh invite.', 'bad');
                         else if (!S.me.id) { S.me.id = myId; res(myId); toast('Signalling unreachable — running solo.', 'bad'); }
                     });
                     this.peer.on('disconnected', () => { if (!S.tableHost) { try { this.peer.reconnect(); } catch (_) {} } });
@@ -1078,7 +1096,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                     // introduce + share my prefs + gossip peers
                     this.send(conn, env('HELLO', { name: S.me.name, emoji: S.me.emoji, prefs: S.myPrefs(), peers: [...this.conns.keys()].filter(p => p !== conn.peer) }));
                     // The side that was DIALED hands the newcomer the full table state.
-                    if (incoming) this.send(conn, env('SYNC', { options: S.options.map(serOpt), members: liveMembers().filter(m => !m.me).map(m => ({ id: m.id, name: m.name, emoji: m.emoji, prefs: m.prefs })) }));
+                    if (incoming) this.send(conn, env('SYNC', { table: { id: S.tableId, name: S.tableName }, options: S.options.map(serOpt), members: liveMembers().filter(m => !m.me).map(m => ({ id: m.id, name: m.name, emoji: m.emoji, prefs: m.prefs })) }));
                     renderApp();
                 });
                 conn.on('data', d => this.onMsg(conn, d));
@@ -1109,9 +1127,16 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
         function handle(e) {
             const p = e.payload || {};
             if (e.type === 'SYNC') {
+                // adopt the host's table identity (joiners only)
+                if (S.tableHost && p.table && p.table.id) { S.tableId = p.table.id; S.tableName = p.table.name || S.tableName; recordCurrentTable(); }
                 (p.members || []).forEach(m => { if (m.id !== S.me.id && !S.members.has(m.id)) S.members.set(m.id, { ...m, online: true }); else if (S.members.get(m.id)) { const x = S.members.get(m.id); x.prefs = x.prefs || m.prefs; } });
                 (p.options || []).forEach(o => { if (!findOpt(o.id)) S.options.push({ ...o, reactions: o.reactions || {}, notes: o.notes || {} }); });
                 S.save(); renderApp(); autoRespondAll(); return;
+            }
+            if (e.type === 'TMETA') {
+                // a table rename from anyone at the table
+                if (!p.id || p.id === S.tableId) { S.tableName = p.name || S.tableName; recordCurrentTable(); S.save(); renderApp(); }
+                return;
             }
             if (e.type === 'PROPOSE') {
                 (p.options || []).forEach(o => { if (!findOpt(o.id)) S.options.push({ ...o, reactions: o.reactions || {}, notes: o.notes || {} }); });
@@ -1419,7 +1444,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 const root = el('div', 'view'); root.id = 'app-root';
                 root.innerHTML = `
                     <div class="topbar">
-                        <div class="brand"><div class="logo">🍽️</div><div><div class="tt">MatchMeal</div><div class="ss" id="table-sub">your table</div></div></div>
+                        <div class="brand" id="brand" title="Tap to rename this table"><div class="logo">🍽️</div><div style="min-width:0"><div class="tt" id="table-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">MatchMeal</div><div class="ss" id="table-sub">your table</div></div></div>
                         <div class="statuspill" id="statpill"><span class="live"></span><span id="stat-label">online</span></div>
                         <button class="iconbtn" id="open-settings"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
                     </div>
@@ -1446,6 +1471,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 const openSettings = () => { syncSettingsSheet(); openSheet('sheet-settings'); };
                 $('open-settings').onclick = openSettings;
                 $('mode-chip').onclick = openSettings;
+                $('brand').onclick = openSettings; $('brand').style.cursor = 'pointer';
                 $('statpill').onclick = openMembers; $('statpill').style.cursor = 'pointer'; $('statpill').title = "See who's at the table";
                 $('find-btn').onclick = findPlaces;
                 $('sort-btn').onclick = () => { sortByRank = !sortByRank; renderBoard(); haptic(); toast(sortByRank ? 'Sorted by best match — updates live' : 'Back to the order they arrived', ''); };
@@ -1455,7 +1481,8 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             const np = Mesh.conns.size;
             $('stat-label').textContent = Mesh.online ? (np ? `${np + 1} here` : 'online') : 'offline';
             $('statpill').className = 'statuspill' + (Mesh.online ? '' : ' off');
-            $('table-sub').textContent = S.tableHost ? 'joined a table' : (np ? 'you host' : 'tap share to invite');
+            $('table-title').textContent = S.tableName || 'MatchMeal';
+            $('table-sub').textContent = (S.tableHost ? 'joined' : (np ? 'you host' : 'tap share to invite')) + ' · rename ›';
             // members + share
             renderMembers();
             // location (guarded so it never re-renders/flashes when unchanged)
@@ -1759,6 +1786,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
         let sheetStack = [];
         function openSheet(id, asChild) {
             $('scrim').classList.add('show');
+            document.documentElement.classList.add('sheet-lock');   // freeze the page behind the sheet
             if (asChild === true && sheetStack.length) {
                 const top = $(sheetStack[sheetStack.length - 1]); if (top) top.classList.remove('show');
             } else {
@@ -1777,7 +1805,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 syncSheetChrome();
             } else closeSheets();
         }
-        function closeSheets() { $('scrim').classList.remove('show'); document.querySelectorAll('.sheet').forEach(s => s.classList.remove('show')); sheetStack = []; }
+        function closeSheets() { $('scrim').classList.remove('show'); document.querySelectorAll('.sheet').forEach(s => s.classList.remove('show')); sheetStack = []; document.documentElement.classList.remove('sheet-lock'); }
         // Show the Back affordance only on a sheet that actually has a parent below it.
         function syncSheetChrome() {
             document.querySelectorAll('.sheet').forEach(s => s.classList.remove('has-back'));
@@ -1917,6 +1945,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             host.innerHTML = show ? modelPickHtml() : '';
         }
         function syncSettingsSheet() {
+            $('set-tablename').value = S.tableName || '';
             $('set-name').value = S.me.name;
             $('set-emoji').textContent = S.me.emoji;
             $('set-emoji-row').style.display = 'none';
@@ -1935,6 +1964,9 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             const b = e.target.closest('[data-mid]'); if (!b) return;
             setBrowserModel(b.dataset.mid); renderModelPick(); haptic();
         };
+        // table rename — anyone at the table can do it; broadcast to everyone
+        $('set-tablename').onchange = e => { const v = e.target.value.trim(); if (v) setTableName(v); else $('set-tablename').value = S.tableName || ''; };
+        $('set-tablename').onkeydown = e => { if (e.key === 'Enter') e.target.blur(); };
         // name + avatar editing (broadcasts so peers see the change live)
         $('set-name').oninput = e => { S.me.name = e.target.value; };
         $('set-name').onchange = () => { if (!S.me.name.trim()) S.me.name = 'Guest ' + uid(2); S.save(); broadcastPrefs(); renderApp(); $('set-name').value = S.me.name; toast('Name updated', 'good'); };
@@ -1945,10 +1977,12 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
         $('saved-prefs').onclick = () => openSaved(true);
         $('edit-taste').onclick = () => openTaste(true);
         $('leave-table').onclick = async () => {
-            if (await confirmDialog({ icon: '🧹', title: 'Start a fresh table?', message: 'This clears the current options for you and begins a brand-new empty table.', confirm: 'Start fresh', cancel: 'Keep this table', danger: true })) {
+            if (await confirmDialog({ icon: '🧹', title: 'Start a fresh table?', message: 'This clears the current options for you and begins a brand-new empty table. Your past tables stay saved.', confirm: 'Start fresh', cancel: 'Keep this table', danger: true })) {
                 S.options = []; S.members.clear(); S.tableHost = null; S.lastTable = null; cardEls.clear(); $('board').innerHTML = '';
+                S.tableId = null; S.tableName = null; ensureTable(); recordCurrentTable();   // brand-new table identity
                 try { localStorage.removeItem('mm2_lasttable'); } catch (_) {}
                 S.save(); renderApp(); closeSheets();
+                toast(`New table: ${S.tableName}`, 'good');
             }
         };
 
@@ -2010,29 +2044,48 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
 
         // past tables — what you joined and what got locked in
         $('past-tables').onclick = () => openTables(true);
-        function currentTableId() { return S.tableHost || S.me.id; }
+        // Identity of the table (its own id; falls back to the peer id for legacy data).
+        function currentTableId() { return S.tableId || S.tableHost || S.me.id; }
         function recordResult(o) {
             const id = currentTableId(); if (!id) return;
             S.me.tableHistory = S.me.tableHistory || [];
             let e = S.me.tableHistory.find(x => x.id === id);
             if (!e) { e = { id, ts: now() }; S.me.tableHistory.unshift(e); }
-            e.result = { name: o.name, lat: o.lat, lon: o.lon, ts: now() }; e.ts = now();
-            if (S.me.tableHistory.length > 20) S.me.tableHistory.length = 20;
+            e.result = { name: o.name, lat: o.lat, lon: o.lon, ts: now() };
+            e.name = S.tableName || e.name || ''; e.host = S.tableHost || S.me.id; e.mine = !S.tableHost; e.ts = now();
+            if (S.me.tableHistory.length > 50) S.me.tableHistory.length = 50;
             S.save();
         }
-        function openTables(asChild) {
+        let tableFilter = 'decided';   // 'decided' (default) | 'all'
+        function openTables(asChild) { renderTables(); openSheet('sheet-tables', asChild); }
+        function renderTables() {
             const list = $('tables-list');
-            const th = (S.me.tableHistory || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
-            if (!th.length) { list.innerHTML = '<p class="sub">No past tables yet. Once you join or host a table, it shows up here with whatever got locked in.</p>'; openSheet('sheet-tables', asChild); return; }
-            list.innerHTML = th.map(t => {
+            let th = (S.me.tableHistory || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+            if (tableFilter === 'decided') th = th.filter(t => t.result);
+            const filterBar = `<div class="seg" id="tables-filter" style="margin-bottom:14px">
+                <div class="opt ${tableFilter === 'decided' ? 'on' : ''}" data-f="decided">Decided</div>
+                <div class="opt ${tableFilter === 'all' ? 'on' : ''}" data-f="all">All</div></div>`;
+            if (!th.length) {
+                list.innerHTML = filterBar + `<p class="sub">${tableFilter === 'decided' ? 'No decided tables yet — lock a place in and it shows up here.' : 'No tables yet. Host or join one and it’ll appear here.'}</p>`;
+                return;
+            }
+            list.innerHTML = filterBar + th.map(t => {
                 const when = new Date(t.ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                const res = t.result ? `<div class="tr-res">🏆 ${esc(t.result.name)}</div>` : '<div class="tr-res tr-none">no decision recorded</div>';
-                const mine = t.id === S.me.id;
-                return `<div class="trow"><div class="tr-meta"><div class="tr-id">${mine ? 'Your table' : 'Table ' + esc(t.id)}</div><div class="tr-when">${esc(when)}</div>${res}</div>${mine ? '' : `<button class="btn soft btn-rejoin" data-join="${esc(t.id)}">Rejoin</button>`}</div>`;
+                const host = t.host || t.id, mine = t.mine || host === S.me.id;
+                const name = t.name || (mine ? 'Your table' : 'Table ' + String(t.id || '').slice(-4));
+                const res = t.result ? `<div class="tr-res">🏆 ${esc(t.result.name)}</div>` : '<div class="tr-res tr-none">⏳ still deciding</div>';
+                return `<div class="trow"><div class="tr-meta"><div class="tr-id">${esc(name)}</div><div class="tr-when">${esc(when)}${mine ? ' · you host' : ''}</div>${res}</div><button class="btn soft btn-rejoin" data-join="${esc(t.id)}">${mine ? 'Revive' : 'Rejoin'}</button></div>`;
             }).join('');
-            openSheet('sheet-tables', asChild);
         }
-        $('tables-list').onclick = e => { const j = e.target.closest('[data-join]'); if (j) { const id = j.dataset.join; location.href = `${location.pathname}?t=${id}`; } };
+        $('tables-list').onclick = e => {
+            const f = e.target.closest('[data-f]');
+            if (f) { tableFilter = f.dataset.f; renderTables(); haptic(); return; }
+            const j = e.target.closest('[data-join]'); if (!j) return;
+            const t = (S.me.tableHistory || []).find(x => x.id === j.dataset.join); if (!t) return;
+            const host = t.host || t.id;
+            if (host === S.me.id) { toast('That was your table — share a fresh invite to gather everyone again.', ''); return; }
+            toast('Reconnecting…'); location.href = `${location.pathname}?t=${host}`;
+        };
 
         // taste editor sheet
         function openTaste(asChild) {
@@ -2103,22 +2156,59 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             const t = new URLSearchParams(location.search).get('t') || (S.lastTable && S.lastTable.id);
             const fromLink = !!new URLSearchParams(location.search).get('t');
             if (t && t !== S.me.id) {
-                S.tableHost = t; recordTable(t);
+                S.tableHost = t; S.lastTable = { id: t, ts: now() };
+                // tableId / tableName arrive from the host via SYNC; record then.
                 setTimeout(() => Mesh.connect(t), 600);
                 if (!fromLink) toast('Rejoining your last table…');
+            } else {
+                S.tableHost = null;
+                ensureTable();          // I'm the host — make sure my table has a name + id
+                recordCurrentTable();
             }
+            S.save();
             render();   // refresh now that we're online (status pill, peers, etc.)
             // share prompt for fresh hosts only
             if (!t) setTimeout(() => { if (!Mesh.conns.size) openShare(); }, 700);
         }
-        // Remember tables I join so I can auto-rejoin and review them later.
-        function recordTable(id) {
-            S.lastTable = { id, ts: now() };
+        // ---- table identity (a table has its OWN id, separate from the host's peer id,
+        // so the same host's successive tables stay distinct in your history) ----
+        function newTableId() { return 'tb_' + uid(8); }
+        function mealLabel(d = new Date()) {
+            const h = d.getHours();
+            if (h < 5) return 'Late Bite'; if (h < 10) return 'Breakfast'; if (h < 12) return 'Brunch';
+            if (h < 15) return 'Lunch'; if (h < 17) return 'Afternoon Bite'; if (h < 21) return 'Dinner'; return 'Supper';
+        }
+        const TABLE_ADJ = ['Cosy', 'Hungry', 'Happy', 'Merry', 'Sunny', 'Snug', 'Jolly', 'Zesty', 'Toasty', 'Breezy', 'Peckish', 'Cheery'];
+        function genTableName(d = new Date()) {
+            const adj = TABLE_ADJ[Math.floor(Math.random() * TABLE_ADJ.length)];
+            return `${adj} ${mealLabel(d)} · ${d.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+        }
+        // Give the host's table an identity if it doesn't have one yet.
+        function ensureTable() {
+            if (S.tableHost) return;                 // joiners inherit the host's id/name
+            if (!S.tableId) S.tableId = newTableId();
+            if (!S.tableName) S.tableName = genTableName();
+        }
+        // Log the current table into history (created on host, on SYNC for joiners).
+        function recordCurrentTable() {
+            const id = S.tableId; if (!id) return;
+            S.lastTable = { id: S.tableHost || S.me.id, ts: now() };   // peer to reconnect to
             S.me.tableHistory = S.me.tableHistory || [];
-            const ex = S.me.tableHistory.find(x => x.id === id);
-            if (ex) ex.ts = now(); else S.me.tableHistory.unshift({ id, ts: now() });
-            if (S.me.tableHistory.length > 20) S.me.tableHistory.length = 20;
-            S.save();
+            let e = S.me.tableHistory.find(x => x.id === id);
+            if (!e) { e = { id, ts: now() }; S.me.tableHistory.unshift(e); }
+            e.name = S.tableName || e.name || '';
+            e.host = S.tableHost || S.me.id;
+            e.mine = !S.tableHost;
+            e.ts = now();
+            if (S.me.tableHistory.length > 50) S.me.tableHistory.length = 50;
+        }
+        // Rename the table — anyone at the table may do this; the change is shared.
+        function setTableName(name) {
+            name = (name || '').trim().slice(0, 40); if (!name || name === S.tableName) return;
+            S.tableName = name; recordCurrentTable(); S.save();
+            Mesh.emit('TMETA', { id: S.tableId, name });
+            renderApp();
+            toast('Table renamed', 'good');
         }
 
         async function init() {
