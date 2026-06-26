@@ -786,10 +786,12 @@
                     // Restore the table I'm refreshing back into: same options + cards,
                     // last-known members (offline until the mesh reconnects them).
                     const urlT = new URLSearchParams(location.search).get('t');
-                    if (urlT && urlT !== (this.tableHost || this.me.id)) {
+                    const urlTList = urlT ? urlT.split(',').map(x => x.trim()).filter(Boolean) : [];
+                    const urlHost = urlTList.length > 0 ? urlTList[0] : null;
+                    if (urlHost && urlHost !== (this.tableHost || this.me.id)) {
                         // Opening a DIFFERENT host's link than the one saved — that's a fresh
                         // join, so drop the old table; its id/name arrive via SYNC.
-                        this.tableHost = urlT; this.tableId = null; this.tableName = null;
+                        this.tableHost = urlHost; this.tableId = null; this.tableName = null;
                     } else {
                         const target = this.tableId || this.tableHost || this.me.id;
                         const tbl = JSON.parse(localStorage.getItem('mm2_table') || 'null');
@@ -1918,8 +1920,9 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
         }
 
         function shareUrl() {
-            const alive = liveMembers().map(m => m.id);
-            const list = [S.me.id, ...alive.filter(id => id !== S.me.id && id)];
+            const myId = S.me.id || localStorage.getItem('mm2_peerid') || '';
+            const alive = liveMembers().map(m => m.id).filter(Boolean);
+            const list = [myId, ...alive.filter(id => id !== myId)].filter(id => id && id !== 'undefined' && id !== 'null');
             return `${location.origin}${location.pathname}?t=${list.join(',')}`;
         }
         let qrDone = false;
@@ -2279,18 +2282,19 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             const tStr = new URLSearchParams(location.search).get('t') || (S.lastTable && S.lastTable.id);
             const fromLink = !!new URLSearchParams(location.search).get('t');
             const histEntry = S.tableId ? (S.me.tableHistory || []).find(x => x.id === S.tableId) : null;
-            if (tStr && tStr !== S.me.id) {
-                const tList = tStr.split(',').map(x => x.trim()).filter(Boolean);
+            const tList = tStr ? tStr.split(',').map(x => x.trim()).filter(Boolean) : [];
+            const isGuest = tList.length > 0 && tList[0] !== S.me.id && tList[0] !== 'undefined' && tList[0] !== 'null';
+            if (isGuest) {
                 S.tableHost = tList[0]; S.lastTable = { id: tStr, ts: now() };
                 tList.forEach((pid, index) => {
-                    if (pid !== S.me.id) {
+                    if (pid !== S.me.id && pid !== 'undefined' && pid !== 'null') {
                         setTimeout(() => Mesh.connect(pid), 600 + index * 100);
                     }
                 });
                 if (histEntry && histEntry.peers) {
                     setTimeout(() => {
                         histEntry.peers.forEach(pid => {
-                            if (pid !== S.me.id && !tList.includes(pid)) {
+                            if (pid !== S.me.id && pid !== 'undefined' && pid !== 'null' && !tList.includes(pid)) {
                                 Mesh.connect(pid);
                             }
                         });
@@ -2304,7 +2308,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 if (histEntry && histEntry.peers) {
                     setTimeout(() => {
                         histEntry.peers.forEach(pid => {
-                            if (pid !== S.me.id) {
+                            if (pid !== S.me.id && pid !== 'undefined' && pid !== 'null') {
                                 Mesh.connect(pid);
                             }
                         });
@@ -2596,6 +2600,12 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             
             setupSwipeHandlers();
             setupSavedSwipeHandlers();
+            
+            window.addEventListener('beforeunload', () => {
+                if (Mesh.peer && !Mesh.peer.destroyed) {
+                    Mesh.peer.destroy();
+                }
+            });
         }
         document.addEventListener('DOMContentLoaded', init);
         if (document.readyState !== 'loading') init();
