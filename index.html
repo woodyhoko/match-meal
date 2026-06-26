@@ -22,6 +22,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1" />
     <meta name="theme-color" content="#fff7f0" />
+    <!-- Always revalidate the page so a refresh picks up the latest build instead of a stale cached copy. -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>MatchMeal — pick a place, together</title>
     <meta name="description" content="Decide where to eat, together. Share a link, everyone adds their taste, and MatchMeal finds the place the whole table loves." />
     <meta name="author" content="woodyhoko" />
@@ -303,6 +307,9 @@
             background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; margin-bottom: 14px; box-shadow: var(--shadow-sm);
             transition: transform .45s var(--ease), box-shadow .25s, border-color .25s; will-change: transform;
         }
+        /* Entry fade lives on a TEMPORARY class, removed right after it plays, so a
+           card never keeps an animation that could restart (= flash) on reposition. */
+        .opt.opt-in { animation: fadeUp .45s var(--ease) both; }
         .opt.top { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft), var(--shadow); }
         .opt.won { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-soft), var(--shadow); }
         .opt-head { display: flex; gap: 13px; align-items: flex-start; }
@@ -1441,11 +1448,14 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             return false;
         }
 
-        // One-shot entry fade: applied only to brand-new cards, then cleared on end
-        // so a later re-position can never restart it (which caused the flashing).
+        // One-shot entry fade on a temporary class. Cleanup is GUARANTEED by a timer
+        // (animationend alone proved unreliable — it bubbles from child animations and
+        // can be missed when the tab is throttled, leaving the animation stuck on the
+        // card so any later move restarted it and flashed). Once the class is gone the
+        // card has no animation at all, so repositioning it can never flash again.
         function playEnter(c) {
-            c.style.animation = 'fadeUp .45s var(--ease) both';
-            c.addEventListener('animationend', () => { c.style.animation = ''; }, { once: true });
+            c.classList.add('opt-in');
+            setTimeout(() => c.classList.remove('opt-in'), 520);
         }
         function renderBoard() {
             const board = $('board'), n = $('board-n');
@@ -1474,7 +1484,9 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 // Only move a card when its slot actually changed. Re-appending an
                 // already-placed node restarts its entry animation — that was the
                 // flash where cards vanished and faded back in after each reaction.
-                if (board.children[i] !== c) board.insertBefore(c, board.children[i] || null);
+                // Only move a card when its slot changed, and strip any still-playing
+                // entry animation first so the move can't restart it (= flash).
+                if (board.children[i] !== c) { if (!fresh.has(c)) c.classList.remove('opt-in'); board.insertBefore(c, board.children[i] || null); }
                 if (fresh.has(c)) playEnter(c);   // one-shot fade-in for brand-new cards only
             });
             if (orderChanged) {
@@ -1553,7 +1565,8 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
         function paintCard(card, o, leaderId) {
             const c = consensusState(o), mem = liveMembers(), notes = o.notes || {};
             const isTop = !o.won && o.id === leaderId && c.total > 1;
-            const cls = 'opt' + (o.won ? ' won' : (isTop ? ' top' : ''));
+            const keep = card.classList.contains('opt-in') ? ' opt-in' : '';   // don't strip a still-playing entry
+            const cls = 'opt' + (o.won ? ' won' : (isTop ? ' top' : '')) + keep;
             if (card.className !== cls) card.className = cls;
             const gdir = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(o.lat + ',' + o.lon)}`;
             setRegion(card.querySelector('.opt-ic'), `${o.won ? '🏆' : isTop ? '🥇' : '🍽️'}${(o.won || isTop) ? `<span class="rankbadge">${o.won ? '✓' : '1'}</span>` : ''}`);
