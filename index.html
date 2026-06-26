@@ -1089,23 +1089,44 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
 
         /* ============================ mesh (PeerJS) ============================ */
         const Mesh = {
-            peer: null, conns: new Map(), online: false,
+            peer: null, conns: new Map(), online: false, _retriedTaken: false,
             seenAdd(id) { S.seen.add(id); S.seenOrder.push(id); if (S.seenOrder.length > 800) S.seen.delete(S.seenOrder.shift()); },
             start() {
                 // Reuse a stable id across refreshes so the invite link stays valid
                 // and friends can auto-rejoin the same table.
                 const myId = localStorage.getItem('mm2_peerid') || ('tbl-' + uid(6));
                 return new Promise(res => {
-                    this.peer = new Peer(myId, { debug: 1 });
-                    this.peer.on('open', id => { S.me.id = id; this.online = true; localStorage.setItem('mm2_peerid', id); res(id); });
+                    this.peer = new Peer(myId, {
+                        debug: 1,
+                        config: {
+                            iceServers: [
+                                { urls: 'stun:stun.l.google.com:19302' },
+                                { urls: 'stun:global.stun.twilio.com:3478' }
+                            ]
+                        }
+                    });
+                    this.peer.on('open', id => { this._retriedTaken = false; S.me.id = id; this.online = true; localStorage.setItem('mm2_peerid', id); res(id); });
                     this.peer.on('connection', c => this.wire(c, true));
                     this.peer.on('error', e => {
                         console.warn('peer err', e.type);
-                        if (e.type === 'unavailable-id') { localStorage.removeItem('mm2_peerid'); this.peer.destroy(); this.start().then(res); } // id taken (another tab) — get a fresh one
+                        if (e.type === 'unavailable-id') {
+                            if (!this._retriedTaken) {
+                                this._retriedTaken = true;
+                                console.log('ID taken, retrying same ID in 1s...');
+                                try { this.peer.destroy(); } catch (_) {}
+                                setTimeout(() => this.start().then(res), 1000);
+                            } else {
+                                this._retriedTaken = false;
+                                console.log('ID taken again, rotating to a fresh ID...');
+                                localStorage.removeItem('mm2_peerid');
+                                try { this.peer.destroy(); } catch (_) {}
+                                this.start().then(res);
+                            }
+                        }
                         else if (e.type === 'peer-unavailable') { if (!Mesh.conns.size) toast('That table has wrapped up — ask them to share a fresh invite.', 'bad'); }
                         else if (!S.me.id) { S.me.id = myId; res(myId); toast('Signalling unreachable — running solo.', 'bad'); }
                     });
-                    this.peer.on('disconnected', () => { if (!S.tableHost) { try { this.peer.reconnect(); } catch (_) {} } });
+                    this.peer.on('disconnected', () => { if (!S.tableHost && this.peer && !this.peer.destroyed) { try { this.peer.reconnect(); } catch (_) {} } });
                 });
             },
             connect(id) { id = (id || '').trim(); if (!id || id === S.me.id || this.conns.has(id)) return; this.wire(this.peer.connect(id, { reliable: true }), false); },
