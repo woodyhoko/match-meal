@@ -276,6 +276,10 @@
         .statuspill .live::after { content:''; position:absolute; inset:-3px; border-radius:50%; background: var(--green); animation: pulse 1.8s ease-out infinite; }
         .statuspill.off .live { background: var(--faint); }
         .statuspill.off .live::after { display: none; }
+        @media (max-width: 480px) {
+            .statuspill { padding: 8px; border-radius: 50%; gap: 0; }
+            .statuspill #stat-label { display: none; }
+        }
 
         /* location bar */
         .locbar { display: flex; align-items: center; gap: 8px; font-size: .88rem; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 11px 14px; box-shadow: var(--shadow-sm); margin-bottom: 14px; }
@@ -343,8 +347,9 @@
         #members-list .mr-dot.off { background: var(--faint); }
         #saved-list { max-height: 56vh; overflow-y: auto; }
         #saved-list { max-height: 52vh; overflow-y: auto; }
-        #saved-list .srow { padding: 11px 2px; border-bottom: 1px solid var(--line); }
-        #saved-list .srow:last-child { border-bottom: none; }
+        #saved-list .srow-wrap { position: relative; overflow: hidden; border-radius: 14px; margin-bottom: 10px; user-select: none; }
+        #saved-list .srow-bg { position: absolute; inset: 0; background: var(--red); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; font-weight: 700; font-size: .88rem; z-index: 1; border-radius: 14px; }
+        #saved-list .srow { position: relative; z-index: 2; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; transition: transform .2s var(--ease); }
         #saved-list .sr-top { display: flex; align-items: center; gap: 8px; }
         #saved-list .sr-name { flex: 1; min-width: 0; font-weight: 700; font-size: .98rem; color: var(--ink); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         #saved-list .sr-name:hover { color: var(--accent); }
@@ -362,14 +367,19 @@
         #saved-list .sr-del { width: 30px; height: 30px; border-radius: 9px; background: var(--bg-2); color: var(--muted); flex: 0 0 auto; font-size: .85rem; }
         #saved-list .sr-del:hover { color: var(--red); }
         #saved-list .sr-cmt { width: 100%; margin-top: 8px; padding: 8px 11px; font-size: .85rem; }
-        #tables-list .trow { display: flex; align-items: center; gap: 10px; padding: 12px 2px; border-bottom: 1px solid var(--line); }
-        #tables-list .trow:last-child { border-bottom: none; }
+
+        #tables-list .trow-wrap { position: relative; overflow: hidden; border-radius: 14px; margin-bottom: 10px; user-select: none; }
+        #tables-list .trow-bg { position: absolute; inset: 0; background: var(--red); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; font-weight: 700; font-size: .88rem; z-index: 1; border-radius: 14px; }
+        #tables-list .trow { position: relative; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; transition: transform .2s var(--ease); margin-bottom: 0 !important; }
         #tables-list .tr-meta { flex: 1; min-width: 0; }
         #tables-list .tr-id { font-weight: 700; font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         #tables-list .tr-when { font-size: .74rem; color: var(--faint); }
         #tables-list .tr-res { font-size: .85rem; color: var(--green); font-weight: 600; margin-top: 3px; }
         #tables-list .tr-res.tr-none { color: var(--faint); font-weight: 400; font-style: italic; }
+        #tables-list .tr-actions { display: flex; gap: 6px; align-items: center; }
         #tables-list .btn-rejoin { flex: 0 0 auto; padding: 8px 14px; }
+        #tables-list .btn-table-del { padding: 8px 10px; min-width: 38px; height: 38px; border-radius: 10px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: .85rem; color: var(--muted); }
+        #tables-list .btn-table-del:hover { color: var(--red); background: var(--bg-2); }
         .lead-banner { align-items: center; gap: 12px; padding: 13px 16px; border-radius: 16px; margin-bottom: 14px; background: linear-gradient(120deg, var(--amber-soft), var(--accent-soft)); border: 1px solid var(--line); animation: fadeUp .35s var(--ease) both; }
         .lead-banner.won { background: var(--green-soft); border-color: var(--green); }
         .lead-banner .lb-ico { font-size: 1.7rem; }
@@ -471,7 +481,7 @@
             .sheet-x { display: grid; }
         }
         .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line-2); margin: 6px auto 14px; }
-        .sheet h3 { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; margin: 0 0 4px; }
+        .sheet h3 { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; margin: 0 0 4px; padding-right: 46px; }
         .sheet .sub { color: var(--ink-2); font-size: .96rem; line-height: 1.5; margin: 0 0 18px; }
         .row { display: flex; gap: 10px; }
         .row > * { flex: 1; }
@@ -579,7 +589,7 @@
     <div class="sheet" id="sheet-share">
         <div class="grab"></div>
         <button class="sheet-x" aria-label="Close">✕</button>
-        <h3>Invite the table</h3>
+        <h3 id="share-title">Invite to table</h3>
         <p class="sub">Send this link. Whoever opens it joins instantly — no app, no sign-up.</p>
         <div class="qrbox" id="qrbox"></div>
         <div class="linkbox"><span class="lk" id="share-link">…</span></div>
@@ -589,15 +599,25 @@
         </div>
     </div>
 
+    <!-- Table settings sheet -->
+    <div class="sheet" id="sheet-table-info">
+        <div class="grab"></div>
+        <button class="sheet-x" aria-label="Close">✕</button>
+        <h3>Table settings</h3>
+        <p class="sub">Manage this table's details.</p>
+        <div class="field-label">Table / Team name</div>
+        <input class="input" id="info-tablename" maxlength="40" placeholder="Name this table" style="margin-bottom:6px" />
+        <div class="chip-hint" style="margin-bottom:16px">Shared with everyone at the table — anyone can change it.</div>
+        <button class="btn block" id="info-invite" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5 8.6 10.5"/></svg> Invite friends</button>
+        <button class="btn soft block" id="info-new-table" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Start a fresh table</button>
+    </div>
+
     <!-- Settings sheet -->
     <div class="sheet" id="sheet-settings">
         <div class="grab"></div>
         <button class="sheet-x" aria-label="Close">✕</button>
         <h3>Your settings</h3>
         <p class="sub">Everything stays on your device.</p>
-        <div class="field-label">Table name</div>
-        <input class="input" id="set-tablename" maxlength="40" placeholder="Name this table" style="margin-bottom:6px" />
-        <div class="chip-hint" style="margin-bottom:16px">Shared with everyone at the table — anyone can change it.</div>
         <div class="field-label">Your name & avatar</div>
         <div class="row" style="margin-bottom:8px">
             <input class="input" id="set-name" maxlength="20" placeholder="Your name" style="flex:2" />
@@ -608,11 +628,9 @@
         <div id="mode-pick"></div>
         <div id="model-pick" style="margin-top:10px;display:none"></div>
         <button class="btn ghost block" id="edit-taste" style="margin-top:18px"><svg class="ic" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg> Edit my taste</button>
-        <button class="btn ghost block" id="who-here" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg> Who's at the table</button>
         <button class="btn ghost block" id="saved-prefs" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg> Saved choices &amp; history</button>
         <button class="btn ghost block" id="past-tables" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 4-6"/></svg> Past tables</button>
-        <button class="btn soft block" id="leave-table" style="margin-top:10px">Start a fresh table</button>
-        <div class="footnote">MatchMeal · © 2026 woodyhoko</div>
+        <div class="footnote" style="margin-top:20px">MatchMeal · © 2026 woodyhoko</div>
     </div>
 
     <!-- Members sheet -->
@@ -784,13 +802,13 @@
                 if (!this.me.name) this.me.name = '';
             },
             save() {
+                this.saveTable();
                 localStorage.setItem('mm2_me', JSON.stringify(this.me));
                 localStorage.setItem('mm2_set', JSON.stringify(this.settings));
                 if (this.loc) localStorage.setItem('mm2_loc', JSON.stringify(this.loc));
                 if (this.lastTable) localStorage.setItem('mm2_lasttable', JSON.stringify(this.lastTable));
                 localStorage.setItem('mm2_onb', this.onboarded ? '1' : '0');
                 localStorage.setItem('mm2_meta', JSON.stringify({ id: this.tableId, name: this.tableName, host: this.tableHost }));
-                this.saveTable();
             },
             // Persist the live table (its options + reactions + who's at it) so a page
             // refresh drops you back into the same table with the same cards.
@@ -803,6 +821,7 @@
                         // roster survives a refresh and they reappear when reconnected
                         members: [...this.members.values()].map(m => ({ id: m.id, name: m.name, emoji: m.emoji, prefs: m.prefs || null }))
                     }));
+                    if (typeof updateTableHistoryEntry === 'function') updateTableHistoryEntry();
                 } catch (_) {}
             },
             myPrefs() { const m = this.me; return { name: m.name, emoji: m.emoji, loves: m.loves, avoids: m.avoids, diet: m.diet, budget: m.budget, radius: m.radius, custom: m.custom || '' }; }
@@ -1081,7 +1100,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                     this.peer.on('error', e => {
                         console.warn('peer err', e.type);
                         if (e.type === 'unavailable-id') { localStorage.removeItem('mm2_peerid'); this.peer.destroy(); this.start().then(res); } // id taken (another tab) — get a fresh one
-                        else if (e.type === 'peer-unavailable') toast('That table has wrapped up — ask them to share a fresh invite.', 'bad');
+                        else if (e.type === 'peer-unavailable') { if (!Mesh.conns.size) toast('That table has wrapped up — ask them to share a fresh invite.', 'bad'); }
                         else if (!S.me.id) { S.me.id = myId; res(myId); toast('Signalling unreachable — running solo.', 'bad'); }
                     });
                     this.peer.on('disconnected', () => { if (!S.tableHost) { try { this.peer.reconnect(); } catch (_) {} } });
@@ -1444,7 +1463,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 const root = el('div', 'view'); root.id = 'app-root';
                 root.innerHTML = `
                     <div class="topbar">
-                        <div class="brand" id="brand" title="Tap to rename this table"><div class="logo">🍽️</div><div style="min-width:0"><div class="tt" id="table-title" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">MatchMeal</div><div class="ss" id="table-sub">your table</div></div></div>
+                        <div class="brand" id="brand" title="Tap to rename this table"><div class="logo">🍽️</div><div style="min-width:0"><div class="tt" id="table-title" style="overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;">MatchMeal</div><div class="ss" id="table-sub">tap to edit</div></div></div>
                         <div class="statuspill" id="statpill"><span class="live"></span><span id="stat-label">online</span></div>
                         <button class="iconbtn" id="open-settings"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
                     </div>
@@ -1471,18 +1490,23 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 const openSettings = () => { syncSettingsSheet(); openSheet('sheet-settings'); };
                 $('open-settings').onclick = openSettings;
                 $('mode-chip').onclick = openSettings;
-                $('brand').onclick = openSettings; $('brand').style.cursor = 'pointer';
+                $('brand').onclick = () => {
+                    $('info-tablename').value = S.tableName || '';
+                    openSheet('sheet-table-info');
+                };
+                $('brand').style.cursor = 'pointer';
                 $('statpill').onclick = openMembers; $('statpill').style.cursor = 'pointer'; $('statpill').title = "See who's at the table";
                 $('find-btn').onclick = findPlaces;
                 $('sort-btn').onclick = () => { sortByRank = !sortByRank; renderBoard(); haptic(); toast(sortByRank ? 'Sorted by best match — updates live' : 'Back to the order they arrived', ''); };
                 $('locbar').onclick = () => openSheet('sheet-loc');
             }
+            if ($('info-tablename') && document.activeElement !== $('info-tablename')) $('info-tablename').value = S.tableName || '';
             // status
             const np = Mesh.conns.size;
             $('stat-label').textContent = Mesh.online ? (np ? `${np + 1} here` : 'online') : 'offline';
             $('statpill').className = 'statuspill' + (Mesh.online ? '' : ' off');
             $('table-title').textContent = S.tableName || 'MatchMeal';
-            $('table-sub').textContent = (S.tableHost ? 'joined' : (np ? 'you host' : 'tap share to invite')) + ' · rename ›';
+            $('table-sub').textContent = 'tap to edit';
             // members + share
             renderMembers();
             // location (guarded so it never re-renders/flashes when unchanged)
@@ -1883,10 +1907,15 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             setTimeout(() => s.remove(), 480);
         }
 
-        function shareUrl() { return `${location.origin}${location.pathname}?t=${S.tableHost || S.me.id}`; }
+        function shareUrl() {
+            const alive = liveMembers().map(m => m.id);
+            const list = [S.me.id, ...alive.filter(id => id !== S.me.id && id)];
+            return `${location.origin}${location.pathname}?t=${list.join(',')}`;
+        }
         let qrDone = false;
         function openShare() {
             const url = shareUrl();
+            $('share-title').textContent = `Invite to ${S.tableName || 'table'}`;
             $('share-link').textContent = url.replace(/^https?:\/\//, '');
             const box = $('qrbox'); box.innerHTML = '';
             try { new QRCode(box, { text: url, width: 168, height: 168, colorDark: '#211611', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M }); }
@@ -1945,7 +1974,6 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             host.innerHTML = show ? modelPickHtml() : '';
         }
         function syncSettingsSheet() {
-            $('set-tablename').value = S.tableName || '';
             $('set-name').value = S.me.name;
             $('set-emoji').textContent = S.me.emoji;
             $('set-emoji-row').style.display = 'none';
@@ -1965,26 +1993,29 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             setBrowserModel(b.dataset.mid); renderModelPick(); haptic();
         };
         // table rename — anyone at the table can do it; broadcast to everyone
-        $('set-tablename').onchange = e => { const v = e.target.value.trim(); if (v) setTableName(v); else $('set-tablename').value = S.tableName || ''; };
-        $('set-tablename').onkeydown = e => { if (e.key === 'Enter') e.target.blur(); };
+        $('info-tablename').onchange = e => { const v = e.target.value.trim(); if (v) setTableName(v); else $('info-tablename').value = S.tableName || ''; };
+        $('info-tablename').onkeydown = e => { if (e.key === 'Enter') e.target.blur(); };
         // name + avatar editing (broadcasts so peers see the change live)
         $('set-name').oninput = e => { S.me.name = e.target.value; };
         $('set-name').onchange = () => { if (!S.me.name.trim()) S.me.name = 'Guest ' + uid(2); S.save(); broadcastPrefs(); renderApp(); $('set-name').value = S.me.name; toast('Name updated', 'good'); };
         $('set-emoji').onclick = () => { const row = $('set-emoji-row'); row.style.display = row.style.display === 'none' ? 'flex' : 'none'; };
         $('set-emoji-row').onclick = e => { const b = e.target.closest('[data-e]'); if (!b) return; S.me.emoji = b.dataset.e; $('set-emoji').textContent = S.me.emoji; $('set-emoji-row').querySelectorAll('.emoji-pick').forEach(x => x.classList.toggle('on', x === b)); $('set-emoji-row').style.display = 'none'; S.save(); broadcastPrefs(); renderApp(); haptic(); };
         // Settings sub-pages open as CHILDREN of Settings, so Back/Save returns there.
-        $('who-here').onclick = () => openMembers(true);
         $('saved-prefs').onclick = () => openSaved(true);
         $('edit-taste').onclick = () => openTaste(true);
-        $('leave-table').onclick = async () => {
+
+        const startFreshTable = async () => {
             if (await confirmDialog({ icon: '🧹', title: 'Start a fresh table?', message: 'This clears the current options for you and begins a brand-new empty table. Your past tables stay saved.', confirm: 'Start fresh', cancel: 'Keep this table', danger: true })) {
                 S.options = []; S.members.clear(); S.tableHost = null; S.lastTable = null; cardEls.clear(); $('board').innerHTML = '';
                 S.tableId = null; S.tableName = null; ensureTable(); recordCurrentTable();   // brand-new table identity
                 try { localStorage.removeItem('mm2_lasttable'); } catch (_) {}
                 S.save(); renderApp(); closeSheets();
+                openShare();
                 toast(`New table: ${S.tableName}`, 'good');
             }
         };
+        $('info-new-table').onclick = startFreshTable;
+        $('info-invite').onclick = () => { openShare(); };
 
         // who's at the table
         function openMembers(asChild) {
@@ -2014,18 +2045,24 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             const list = $('saved-list');
             if (!keys.length) { list.innerHTML = '<p class="sub">No saved choices yet. As you (or your AI) react to places, your decisions are remembered here.</p>'; return; }
             list.innerHTML = keys.map(k => { const it = h[k]; const gm = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((it.name || k) + (it.lat != null ? ' ' + it.lat + ',' + it.lon : ''))}`;
-                return `<div class="srow">
-                    <div class="sr-top"><a class="sr-name" href="${gm}" target="_blank" rel="noopener" title="Open in Google Maps">${esc(it.name || k)} ↗</a><button class="sr-del" data-del="${esc(k)}" title="Forget this">✕</button></div>
-                    ${it.reason ? `<div class="sr-r">${esc(it.reason)}</div>` : ''}
-                    <div class="sr-controls">
-                        <div class="sr-seg">
-                            <button class="sr-b in ${it.r === 'in' ? 'sel' : ''}" data-k="${esc(k)}" data-r="in" title="happy to go">😋</button>
-                            <button class="sr-b ok ${it.r === 'ok' ? 'sel' : ''}" data-k="${esc(k)}" data-r="ok" title="meh">🤔</button>
-                            <button class="sr-b no ${it.r === 'no' ? 'sel' : ''}" data-k="${esc(k)}" data-r="no" title="no">🙅</button>
-                        </div>
-                        <div class="sr-vis">been <button class="sr-step" data-vis="${esc(k)}" data-d="-1">−</button><b>${it.visits || 0}×</b><button class="sr-step" data-vis="${esc(k)}" data-d="1">+</button></div>
+                return `<div class="srow-wrap" data-k="${esc(k)}">
+                    <div class="srow-bg">
+                        <span>🗑️ Forget</span>
+                        <span>Forget 🗑️</span>
                     </div>
-                    <input class="sr-cmt input" data-cmt="${esc(k)}" placeholder="add your own note…" value="${esc(it.userComment || '')}" />
+                    <div class="srow">
+                        <div class="sr-top"><a class="sr-name" href="${gm}" target="_blank" rel="noopener" title="Open in Google Maps">${esc(it.name || k)} ↗</a><button class="sr-del" data-del="${esc(k)}" title="Forget this">✕</button></div>
+                        ${it.reason ? `<div class="sr-r">${esc(it.reason)}</div>` : ''}
+                        <div class="sr-controls">
+                            <div class="sr-seg">
+                                <button class="sr-b in ${it.r === 'in' ? 'sel' : ''}" data-k="${esc(k)}" data-r="in" title="happy to go">😋</button>
+                                <button class="sr-b ok ${it.r === 'ok' ? 'sel' : ''}" data-k="${esc(k)}" data-r="ok" title="meh">🤔</button>
+                                <button class="sr-b no ${it.r === 'no' ? 'sel' : ''}" data-k="${esc(k)}" data-r="no" title="no">🙅</button>
+                            </div>
+                            <div class="sr-vis">been <button class="sr-step" data-vis="${esc(k)}" data-d="-1">−</button><b>${it.visits || 0}×</b><button class="sr-step" data-vis="${esc(k)}" data-d="1">+</button></div>
+                        </div>
+                        <input class="sr-cmt input" data-cmt="${esc(k)}" placeholder="add your own note…" value="${esc(it.userComment || '')}" />
+                    </div>
                 </div>`; }).join('');
         }
         $('saved-sort').onclick = e => { const o = e.target.closest('[data-s]'); if (!o) return; savedSort = o.dataset.s; $('saved-sort').querySelectorAll('.opt').forEach(x => x.classList.toggle('active', x === o)); computeSavedOrder(); renderSaved(); haptic(); };
@@ -2053,7 +2090,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             if (!e) { e = { id, ts: now() }; S.me.tableHistory.unshift(e); }
             e.result = { name: o.name, lat: o.lat, lon: o.lon, ts: now() };
             e.name = S.tableName || e.name || ''; e.host = S.tableHost || S.me.id; e.mine = !S.tableHost; e.ts = now();
-            if (S.me.tableHistory.length > 50) S.me.tableHistory.length = 50;
+            if (S.me.tableHistory.length > 100) S.me.tableHistory.length = 100;
             S.save();
         }
         let tableFilter = 'decided';   // 'decided' (default) | 'all'
@@ -2074,17 +2111,93 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 const host = t.host || t.id, mine = t.mine || host === S.me.id;
                 const name = t.name || (mine ? 'Your table' : 'Table ' + String(t.id || '').slice(-4));
                 const res = t.result ? `<div class="tr-res">🏆 ${esc(t.result.name)}</div>` : '<div class="tr-res tr-none">⏳ still deciding</div>';
-                return `<div class="trow"><div class="tr-meta"><div class="tr-id">${esc(name)}</div><div class="tr-when">${esc(when)}${mine ? ' · you host' : ''}</div>${res}</div><button class="btn soft btn-rejoin" data-join="${esc(t.id)}">${mine ? 'Revive' : 'Rejoin'}</button></div>`;
+                return `<div class="trow-wrap" data-join="${esc(t.id)}">
+                    <div class="trow-bg">
+                        <span>🗑️ Delete</span>
+                        <span>Delete 🗑️</span>
+                    </div>
+                    <div class="trow">
+                        <div class="tr-meta">
+                            <div class="tr-id">${esc(name)}</div>
+                            <div class="tr-when">${esc(when)}${mine ? ' · you host' : ''}</div>
+                            ${res}
+                        </div>
+                        <div class="tr-actions">
+                            <button class="btn soft btn-rejoin" data-join="${esc(t.id)}">Rejoin</button>
+                            <button class="btn ghost btn-table-del" data-del="${esc(t.id)}" title="Delete table">✕</button>
+                        </div>
+                    </div>
+                </div>`;
             }).join('');
         }
-        $('tables-list').onclick = e => {
+        function loadTableFromHistory(t) {
+            S.tableId = t.id;
+            S.tableName = t.name;
+            S.tableHost = t.mine ? null : t.host;
+            S.options = (t.options || []).map(o => ({ ...o, reactions: o.reactions || {}, notes: o.notes || {} }));
+            S.members.clear();
+            (t.members || []).forEach(m => {
+                if (m.id && m.id !== S.me.id) {
+                    S.members.set(m.id, { ...m, online: false });
+                }
+            });
+            S.lastTable = { id: S.tableHost || S.me.id, ts: now() };
+            S.save();
+            renderApp();
+            
+            if (t.peers && t.peers.length) {
+                t.peers.forEach((pid, index) => {
+                    if (pid !== S.me.id) {
+                        setTimeout(() => Mesh.connect(pid), 200 + index * 100);
+                    }
+                });
+            }
+            if (S.tableHost && S.tableHost !== S.me.id && (!t.peers || !t.peers.includes(S.tableHost))) {
+                setTimeout(() => Mesh.connect(S.tableHost), 200);
+            }
+            
+            const url = S.tableHost ? `${location.origin}${location.pathname}?t=${S.tableHost}` : `${location.origin}${location.pathname}`;
+            history.replaceState(null, '', url);
+            toast('Rejoined table: ' + S.tableName, 'good');
+        }
+        $('tables-list').onclick = async e => {
             const f = e.target.closest('[data-f]');
             if (f) { tableFilter = f.dataset.f; renderTables(); haptic(); return; }
+            
+            const del = e.target.closest('[data-del]');
+            if (del) {
+                const tableId = del.dataset.del;
+                const t = (S.me.tableHistory || []).find(x => x.id === tableId);
+                let confirmDelete = true;
+                if (t && t.result) {
+                    confirmDelete = await confirmDialog({
+                        icon: '⚠️',
+                        title: 'Delete this record?',
+                        message: `This table decided on "${t.result.name}". Keeping it provides a nice record of your visits. Are you sure you want to delete it?`,
+                        confirm: 'Delete',
+                        cancel: 'Keep it',
+                        danger: true
+                    });
+                }
+                if (confirmDelete) {
+                    S.me.tableHistory = (S.me.tableHistory || []).filter(x => x.id !== tableId);
+                    if (S.tableId === tableId) {
+                        S.tableId = null; S.tableName = null; S.tableHost = null; S.lastTable = null; S.options = []; S.members.clear(); cardEls.clear(); $('board').innerHTML = '';
+                        ensureTable(); recordCurrentTable();
+                    }
+                    S.save();
+                    renderTables();
+                }
+                haptic();
+                return;
+            }
+            
             const j = e.target.closest('[data-join]'); if (!j) return;
             const t = (S.me.tableHistory || []).find(x => x.id === j.dataset.join); if (!t) return;
-            const host = t.host || t.id;
-            if (host === S.me.id) { toast('That was your table — share a fresh invite to gather everyone again.', ''); return; }
-            toast('Reconnecting…'); location.href = `${location.pathname}?t=${host}`;
+            
+            loadTableFromHistory(t);
+            closeSheets();
+            haptic();
         };
 
         // taste editor sheet
@@ -2153,22 +2266,45 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             // bring my node online
             try { await Mesh.start(); } catch (e) { console.error(e); }
             // join a table from the link, or auto-rejoin the last table on refresh
-            const t = new URLSearchParams(location.search).get('t') || (S.lastTable && S.lastTable.id);
+            const tStr = new URLSearchParams(location.search).get('t') || (S.lastTable && S.lastTable.id);
             const fromLink = !!new URLSearchParams(location.search).get('t');
-            if (t && t !== S.me.id) {
-                S.tableHost = t; S.lastTable = { id: t, ts: now() };
-                // tableId / tableName arrive from the host via SYNC; record then.
-                setTimeout(() => Mesh.connect(t), 600);
+            const histEntry = S.tableId ? (S.me.tableHistory || []).find(x => x.id === S.tableId) : null;
+            if (tStr && tStr !== S.me.id) {
+                const tList = tStr.split(',').map(x => x.trim()).filter(Boolean);
+                S.tableHost = tList[0]; S.lastTable = { id: tStr, ts: now() };
+                tList.forEach((pid, index) => {
+                    if (pid !== S.me.id) {
+                        setTimeout(() => Mesh.connect(pid), 600 + index * 100);
+                    }
+                });
+                if (histEntry && histEntry.peers) {
+                    setTimeout(() => {
+                        histEntry.peers.forEach(pid => {
+                            if (pid !== S.me.id && !tList.includes(pid)) {
+                                Mesh.connect(pid);
+                            }
+                        });
+                    }, 1000);
+                }
                 if (!fromLink) toast('Rejoining your last table…');
             } else {
                 S.tableHost = null;
                 ensureTable();          // I'm the host — make sure my table has a name + id
                 recordCurrentTable();
+                if (histEntry && histEntry.peers) {
+                    setTimeout(() => {
+                        histEntry.peers.forEach(pid => {
+                            if (pid !== S.me.id) {
+                                Mesh.connect(pid);
+                            }
+                        });
+                    }, 1000);
+                }
             }
             S.save();
             render();   // refresh now that we're online (status pill, peers, etc.)
             // share prompt for fresh hosts only
-            if (!t) setTimeout(() => { if (!Mesh.conns.size) openShare(); }, 700);
+            if (!tStr && !S.options.length) setTimeout(() => { if (!Mesh.conns.size) openShare(); }, 700);
         }
         // ---- table identity (a table has its OWN id, separate from the host's peer id,
         // so the same host's successive tables stay distinct in your history) ----
@@ -2190,9 +2326,8 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             if (!S.tableName) S.tableName = genTableName();
         }
         // Log the current table into history (created on host, on SYNC for joiners).
-        function recordCurrentTable() {
+        function updateTableHistoryEntry() {
             const id = S.tableId; if (!id) return;
-            S.lastTable = { id: S.tableHost || S.me.id, ts: now() };   // peer to reconnect to
             S.me.tableHistory = S.me.tableHistory || [];
             let e = S.me.tableHistory.find(x => x.id === id);
             if (!e) { e = { id, ts: now() }; S.me.tableHistory.unshift(e); }
@@ -2200,7 +2335,24 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             e.host = S.tableHost || S.me.id;
             e.mine = !S.tableHost;
             e.ts = now();
-            if (S.me.tableHistory.length > 50) S.me.tableHistory.length = 50;
+            // Cache full options, members and myPeerId
+            e.options = S.options.map(serOpt);
+            e.members = [...S.members.values()].map(m => ({ id: m.id, name: m.name, emoji: m.emoji, prefs: m.prefs || null }));
+            e.myPeerId = S.me.id;
+            
+            // Track all seen peer IDs
+            const peersSet = new Set(e.peers || []);
+            if (S.tableHost) peersSet.add(S.tableHost);
+            for (const pid of S.members.keys()) {
+                peersSet.add(pid);
+            }
+            e.peers = [...peersSet];
+            
+            if (S.me.tableHistory.length > 100) S.me.tableHistory.length = 100;
+        }
+        function recordCurrentTable() {
+            updateTableHistoryEntry();
+            S.save();
         }
         // Rename the table — anyone at the table may do this; the change is shared.
         function setTableName(name) {
@@ -2210,6 +2362,216 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             renderApp();
             toast('Table renamed', 'good');
         }
+
+        /* ============================ swipe to delete ============================ */
+        let swipeEl = null, startX = 0, startY = 0, currentX = 0, isDragging = false, isSwiping = false;
+        const endSwipe = async () => {
+            if (!isDragging || !swipeEl) return;
+            isDragging = false;
+            swipeEl.style.transition = 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
+            const threshold = 100;
+            if (isSwiping && Math.abs(currentX) > threshold) {
+                const dir = currentX > 0 ? 1 : -1;
+                swipeEl.style.transform = `translateX(${dir * 100}%)`;
+                const wrap = swipeEl.closest('.trow-wrap');
+                const tableId = wrap.dataset.join;
+                const t = (S.me.tableHistory || []).find(x => x.id === tableId);
+                let confirmDelete = true;
+                if (t && t.result) {
+                    confirmDelete = await confirmDialog({
+                        icon: '⚠️',
+                        title: 'Delete this record?',
+                        message: `This table decided on "${t.result.name}". Keeping it provides a nice record of your visits. Are you sure you want to delete it?`,
+                        confirm: 'Delete',
+                        cancel: 'Keep it',
+                        danger: true
+                    });
+                }
+                if (confirmDelete) {
+                    S.me.tableHistory = (S.me.tableHistory || []).filter(x => x.id !== tableId);
+                    if (S.tableId === tableId) {
+                        S.tableId = null; S.tableName = null; S.tableHost = null; S.lastTable = null; S.options = []; S.members.clear(); cardEls.clear(); $('board').innerHTML = '';
+                        ensureTable(); recordCurrentTable();
+                    }
+                    S.save();
+                    wrap.style.transition = 'height 0.2s, opacity 0.2s, margin 0.2s';
+                    wrap.style.height = wrap.offsetHeight + 'px';
+                    wrap.offsetHeight; // force reflow
+                    wrap.style.height = '0px';
+                    wrap.style.opacity = '0';
+                    wrap.style.marginBottom = '0px';
+                    wrap.style.marginTop = '0px';
+                    setTimeout(() => { renderTables(); }, 200);
+                } else {
+                    swipeEl.style.transform = 'translateX(0)';
+                }
+            } else {
+                swipeEl.style.transform = 'translateX(0)';
+            }
+            swipeEl = null;
+        };
+
+        const setupSwipeHandlers = () => {
+            const list = $('tables-list');
+            if (!list) return;
+            list.addEventListener('touchstart', e => {
+                const row = e.target.closest('#tables-list .trow');
+                if (!row || e.target.closest('button')) return;
+                swipeEl = row;
+                startX = e.touches[0].clientX;
+                startY = e.touches[0].clientY;
+                isDragging = true;
+                isSwiping = false;
+                swipeEl.style.transition = 'none';
+            }, { passive: true });
+
+            list.addEventListener('touchmove', e => {
+                if (!isDragging || !swipeEl) return;
+                const dx = e.touches[0].clientX - startX;
+                const dy = e.touches[0].clientY - startY;
+                if (!isSwiping) {
+                    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+                        isSwiping = true;
+                    } else if (Math.abs(dy) > 10) {
+                        isDragging = false;
+                    }
+                }
+                if (isSwiping) {
+                    if (e.cancelable) e.preventDefault();
+                    currentX = dx;
+                    swipeEl.style.transform = `translateX(${currentX}px)`;
+                }
+            }, { passive: false });
+
+            list.addEventListener('touchend', endSwipe);
+            list.addEventListener('touchcancel', endSwipe);
+
+            list.addEventListener('mousedown', e => {
+                const row = e.target.closest('#tables-list .trow');
+                if (!row || e.target.closest('button')) return;
+                swipeEl = row;
+                startX = e.clientX;
+                startY = e.clientY;
+                isDragging = true;
+                isSwiping = false;
+                swipeEl.style.transition = 'none';
+            });
+        };
+
+        let savedSwipeEl = null, savedStartX = 0, savedStartY = 0, savedCurrentX = 0, savedIsDragging = false, savedIsSwiping = false;
+        const endSavedSwipe = async () => {
+            if (!savedIsDragging || !savedSwipeEl) return;
+            savedIsDragging = false;
+            savedSwipeEl.style.transition = 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)';
+            const threshold = 100;
+            if (savedIsSwiping && Math.abs(savedCurrentX) > threshold) {
+                const dir = savedCurrentX > 0 ? 1 : -1;
+                savedSwipeEl.style.transform = `translateX(${dir * 100}%)`;
+                const wrap = savedSwipeEl.closest('.srow-wrap');
+                const key = wrap.dataset.k;
+                delete S.me.history[key];
+                S.save();
+                wrap.style.transition = 'height 0.2s, opacity 0.2s, margin 0.2s';
+                wrap.style.height = wrap.offsetHeight + 'px';
+                wrap.offsetHeight; // force reflow
+                wrap.style.height = '0px';
+                wrap.style.opacity = '0';
+                wrap.style.marginBottom = '0px';
+                wrap.style.marginTop = '0px';
+                setTimeout(() => {
+                    computeSavedOrder();
+                    renderSaved();
+                }, 200);
+            } else {
+                savedSwipeEl.style.transform = 'translateX(0)';
+            }
+            savedSwipeEl = null;
+        };
+
+        const setupSavedSwipeHandlers = () => {
+            const list = $('saved-list');
+            if (!list) return;
+            list.addEventListener('touchstart', e => {
+                const row = e.target.closest('#saved-list .srow');
+                if (!row || e.target.closest('button') || e.target.closest('input') || e.target.closest('a')) return;
+                savedSwipeEl = row;
+                savedStartX = e.touches[0].clientX;
+                savedStartY = e.touches[0].clientY;
+                savedIsDragging = true;
+                savedIsSwiping = false;
+                savedSwipeEl.style.transition = 'none';
+            }, { passive: true });
+
+            list.addEventListener('touchmove', e => {
+                if (!savedIsDragging || !savedSwipeEl) return;
+                const dx = e.touches[0].clientX - savedStartX;
+                const dy = e.touches[0].clientY - savedStartY;
+                if (!savedIsSwiping) {
+                    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+                        savedIsSwiping = true;
+                    } else if (Math.abs(dy) > 10) {
+                        savedIsDragging = false;
+                    }
+                }
+                if (savedIsSwiping) {
+                    if (e.cancelable) e.preventDefault();
+                    savedCurrentX = dx;
+                    savedSwipeEl.style.transform = `translateX(${savedCurrentX}px)`;
+                }
+            }, { passive: false });
+
+            list.addEventListener('touchend', endSavedSwipe);
+            list.addEventListener('touchcancel', endSavedSwipe);
+
+            list.addEventListener('mousedown', e => {
+                const row = e.target.closest('#saved-list .srow');
+                if (!row || e.target.closest('button') || e.target.closest('input') || e.target.closest('a')) return;
+                savedSwipeEl = row;
+                savedStartX = e.clientX;
+                savedStartY = e.clientY;
+                savedIsDragging = true;
+                savedIsSwiping = false;
+                savedSwipeEl.style.transition = 'none';
+            });
+        };
+
+        addEventListener('mousemove', e => {
+            if (isDragging && swipeEl) {
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                if (!isSwiping) {
+                    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+                        isSwiping = true;
+                    } else if (Math.abs(dy) > 10) {
+                        isDragging = false;
+                    }
+                }
+                if (isSwiping) {
+                    currentX = dx;
+                    swipeEl.style.transform = `translateX(${currentX}px)`;
+                }
+            }
+            if (savedIsDragging && savedSwipeEl) {
+                const dx = e.clientX - savedStartX;
+                const dy = e.clientY - savedStartY;
+                if (!savedIsSwiping) {
+                    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+                        savedIsSwiping = true;
+                    } else if (Math.abs(dy) > 10) {
+                        savedIsDragging = false;
+                    }
+                }
+                if (savedIsSwiping) {
+                    savedCurrentX = dx;
+                    savedSwipeEl.style.transform = `translateX(${savedCurrentX}px)`;
+                }
+            }
+        });
+
+        addEventListener('mouseup', () => {
+            if (isDragging && swipeEl) endSwipe();
+            if (savedIsDragging && savedSwipeEl) endSavedSwipe();
+        });
 
         async function init() {
             S.load();
@@ -2221,6 +2583,9 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 if (!gpuOK() && S.settings.mode === 'browser') S.settings.mode = 'taste';
                 if (CUR === 'ob' && obStep === 3) renderOnboard();
             }).catch(() => {});
+            
+            setupSwipeHandlers();
+            setupSavedSwipeHandlers();
         }
         document.addEventListener('DOMContentLoaded', init);
         if (document.readyState !== 'loading') init();
