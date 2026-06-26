@@ -1577,7 +1577,17 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             n.textContent = list.length ? `${list.length}` : '';
             if (searching && !list.length) { board.innerHTML = '<div class="skel"></div><div class="skel"></div><div class="skel"></div>'; cardEls.clear(); return; }
             if (!list.length) {
-                board.innerHTML = `<div class="empty"><span class="be">🍜</span>${Mesh.conns.size ? 'Nothing on the table yet.<br>Hit <b>Find places</b> to load spots everyone can react to.' : 'Invite a friend, set your spot,<br>then find places together.'}</div>`;
+                const getEmptyEmoji = () => {
+                    const loves = S.me.loves || [];
+                    if (loves.length) {
+                        const item = loves[Math.floor(Math.random() * loves.length)];
+                        return item.split(' ')[0] || '🍜';
+                    }
+                    const randCuisine = CUISINES[Math.floor(Math.random() * CUISINES.length)];
+                    return randCuisine ? randCuisine.split(' ')[0] : '🍜';
+                };
+                const emoji = getEmptyEmoji();
+                board.innerHTML = `<div class="empty"><span class="be">${emoji}</span>${Mesh.conns.size ? 'Nothing on the table yet.<br>Hit <b>Find places</b> to load spots everyone can react to.' : 'Invite a friend, set your spot,<br>then find places together.'}</div>`;
                 cardEls.clear(); updateSortBtn(); return;
             }
             if (board.querySelector('.empty') || board.querySelector('.skel')) { board.innerHTML = ''; cardEls.clear(); }
