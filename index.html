@@ -1098,12 +1098,12 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 return new Promise(res => {
                     this.peer = new Peer(myId, {
                         debug: 1,
-                        config: {
-                            iceServers: [
-                                { urls: 'stun:stun.l.google.com:19302' },
-                                { urls: 'stun:global.stun.twilio.com:3478' }
-                            ]
-                        }
+                        // config: {
+                        //     iceServers: [
+                        //         { urls: 'stun:stun.l.google.com:19302' },
+                        //         { urls: 'stun:global.stun.twilio.com:3478' }
+                        //     ]
+                        // }
                     });
                     this.peer.on('open', id => { this._retriedTaken = false; S.me.id = id; this.online = true; localStorage.setItem('mm2_peerid', id); res(id); });
                     this.peer.on('connection', c => this.wire(c, true));
