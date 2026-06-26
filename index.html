@@ -84,12 +84,20 @@
         }
 
         @media (prefers-color-scheme: dark) {
-            :root {
+            /* Only apply system dark when user hasn't forced a specific theme */
+            :root:not([data-theme="light"]):not([data-theme="dark"]) {
                 --bg: #17110d; --bg-2: #1f1611; --card: #241a14; --ink: #f7ede4; --ink-2: #d8c6b8;
                 --muted: #ab9889; --faint: #6f5f53; --line: #34271f; --line-2: #3d2e25;
                 --accent-soft: #36211a; --green-soft: #14271d; --yellow-soft: #2b2113; --red-soft: #301a1d;
                 --shadow-sm: 0 2px 8px rgba(0,0,0,.3); --shadow: 0 12px 34px rgba(0,0,0,.45); --shadow-lg: 0 24px 60px rgba(0,0,0,.55);
             }
+        }
+        /* Force dark theme regardless of system setting */
+        :root[data-theme="dark"] {
+            --bg: #17110d; --bg-2: #1f1611; --card: #241a14; --ink: #f7ede4; --ink-2: #d8c6b8;
+            --muted: #ab9889; --faint: #6f5f53; --line: #34271f; --line-2: #3d2e25;
+            --accent-soft: #36211a; --green-soft: #14271d; --yellow-soft: #2b2113; --red-soft: #301a1d;
+            --shadow-sm: 0 2px 8px rgba(0,0,0,.3); --shadow: 0 12px 34px rgba(0,0,0,.45); --shadow-lg: 0 24px 60px rgba(0,0,0,.55);
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -173,21 +181,25 @@
             display: inline-flex; align-items: center; justify-content: center; gap: 9px;
             font-size: 1.02rem; font-weight: 700; letter-spacing: -.01em;
             background: var(--accent); color: #fff; border-radius: 16px; padding: 15px 22px;
-            box-shadow: 0 10px 24px rgba(255, 90, 54, .32); transition: transform .12s var(--ease), box-shadow .2s, background .15s;
+            box-shadow: 0 10px 24px rgba(255, 90, 54, .32); transition: transform .15s var(--ease), box-shadow .2s var(--ease), background .15s, filter .15s;
         }
-        .btn:active { transform: scale(.96); background: var(--accent-press); }
-        .btn:disabled { opacity: .5; box-shadow: none; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 14px 28px rgba(255, 90, 54, .38); filter: brightness(1.04); }
+        .btn:active { transform: scale(.96) translateY(0); background: var(--accent-press); box-shadow: 0 6px 14px rgba(255, 90, 54, .22); filter: none; }
+        .btn:disabled { opacity: .5; box-shadow: none; transform: none; filter: none; }
         .btn.block { width: 100%; }
         .btn.lg { padding: 17px 24px; font-size: 1.08rem; border-radius: 18px; }
         .btn.ghost { background: var(--card); color: var(--ink); box-shadow: var(--shadow-sm); border: 1px solid var(--line); }
-        .btn.ghost:active { background: var(--bg-2); }
+        .btn.ghost:hover { background: var(--bg-2); box-shadow: var(--shadow); transform: translateY(-2px); filter: none; }
+        .btn.ghost:active { background: var(--bg-2); transform: scale(.96); box-shadow: var(--shadow-sm); }
         .btn.soft { background: var(--accent-soft); color: var(--accent); box-shadow: none; }
-        .btn.soft:active { background: #ffe2d8; }
+        .btn.soft:hover { background: var(--accent-soft); box-shadow: 0 6px 16px rgba(255, 90, 54, .14); transform: translateY(-2px); filter: none; }
+        .btn.soft:active { background: #ffe2d8; transform: scale(.96); box-shadow: none; }
         .iconbtn {
             width: 44px; height: 44px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center;
-            background: var(--card); color: var(--ink-2); box-shadow: var(--shadow-sm); border: 1px solid var(--line); transition: transform .12s, background .15s; flex: 0 0 auto;
+            background: var(--card); color: var(--ink-2); box-shadow: var(--shadow-sm); border: 1px solid var(--line); transition: transform .15s var(--ease), background .15s, box-shadow .15s; flex: 0 0 auto;
         }
-        .iconbtn:active { transform: scale(.92); background: var(--bg-2); }
+        .iconbtn:hover { transform: translateY(-2px); box-shadow: var(--shadow); background: var(--bg-2); }
+        .iconbtn:active { transform: scale(.92); background: var(--bg-2); box-shadow: var(--shadow-sm); }
 
         /* ---------------- Onboarding ---------------- */
         .ob { flex: 1; display: flex; flex-direction: column; padding-top: calc(env(safe-area-inset-top) + 8px); }
@@ -256,8 +268,8 @@
         .topbar { display: flex; align-items: center; gap: 12px; padding: calc(env(safe-area-inset-top) + 14px) 2px 12px; position: sticky; top: 0; z-index: 20; background: linear-gradient(var(--bg) 70%, transparent); }
         .brand { display: flex; align-items: center; gap: 10px; margin-right: auto; min-width: 0; }
         .brand .logo { width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(135deg, var(--accent), var(--amber)); display: grid; place-items: center; font-size: 1.15rem; box-shadow: 0 6px 16px rgba(255,90,54,.35); flex: 0 0 auto; }
-        .brand .tt { font-weight: 800; font-size: 1.15rem; letter-spacing: -.02em; line-height: 1; }
-        .brand .ss { font-size: .74rem; color: var(--muted); margin-top: 2px; }
+        .brand .tt { font-weight: 800; font-size: 1rem; letter-spacing: -.02em; line-height: 1.2; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
+        .brand .ss { font-size: .74rem; color: var(--muted); margin-top: 3px; }
 
         /* members row */
         .members { display: flex; align-items: center; gap: 10px; padding: 4px 2px 14px; }
@@ -270,16 +282,26 @@
         .members .mcount { font-size: .9rem; color: var(--muted); font-weight: 600; }
         .members .share-mini { margin-left: auto; }
 
-        /* status pill */
-        .statuspill { display: inline-flex; align-items: center; gap: 7px; font-size: .8rem; font-weight: 600; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; box-shadow: var(--shadow-sm); }
-        .statuspill .live { width: 7px; height: 7px; border-radius: 50%; background: var(--green); position: relative; }
-        .statuspill .live::after { content:''; position:absolute; inset:-3px; border-radius:50%; background: var(--green); animation: pulse 1.8s ease-out infinite; }
+        /* status pill — matches active-badge style */
+        .statuspill {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 4px 10px;
+            background: var(--green-soft); color: var(--green);
+            font-size: 0.76rem; font-weight: 800;
+            border-radius: 999px;
+            text-transform: uppercase; letter-spacing: 0.04em;
+            border: none; box-shadow: none;
+            transition: opacity .2s;
+        }
+        .statuspill .live { width: 7px; height: 7px; border-radius: 50%; background: var(--green); position: relative; flex: 0 0 auto; }
+        .statuspill .live::after { content:''; position:absolute; inset:-4px; border-radius:50%; border: 2px solid var(--green); opacity:0; animation: pulse-ring 2s cubic-bezier(0.215, 0.610, 0.355, 1) infinite; }
+        .statuspill.off { background: var(--bg-2); color: var(--muted); }
         .statuspill.off .live { background: var(--faint); }
         .statuspill.off .live::after { display: none; }
-        @media (max-width: 480px) {
-            .statuspill { padding: 8px; border-radius: 50%; gap: 0; }
-            .statuspill #stat-label { display: none; }
-        }
+        /* Hide the topbar pill in dashboard mode — status is shown in the Current Table card instead */
+        .dashboard #statpill { display: none; }
+        /* Trailing word in pill hides on narrow phones; the number always stays */
+        @media (max-width: 399px) { .stat-word { display: none; } }
 
         /* location bar */
         .locbar { display: flex; align-items: center; gap: 8px; font-size: .88rem; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 11px 14px; box-shadow: var(--shadow-sm); margin-bottom: 14px; }
@@ -368,18 +390,18 @@
         #saved-list .sr-del:hover { color: var(--red); }
         #saved-list .sr-cmt { width: 100%; margin-top: 8px; padding: 8px 11px; font-size: .85rem; }
 
-        #tables-list .trow-wrap { position: relative; overflow: hidden; border-radius: 14px; margin-bottom: 10px; user-select: none; }
-        #tables-list .trow-bg { position: absolute; inset: 0; background: var(--red); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; font-weight: 700; font-size: .88rem; z-index: 1; border-radius: 14px; }
-        #tables-list .trow { position: relative; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; transition: transform .2s var(--ease); margin-bottom: 0 !important; }
-        #tables-list .tr-meta { flex: 1; min-width: 0; }
-        #tables-list .tr-id { font-weight: 700; font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        #tables-list .tr-when { font-size: .74rem; color: var(--faint); }
-        #tables-list .tr-res { font-size: .85rem; color: var(--green); font-weight: 600; margin-top: 3px; }
-        #tables-list .tr-res.tr-none { color: var(--faint); font-weight: 400; font-style: italic; }
-        #tables-list .tr-actions { display: flex; gap: 6px; align-items: center; }
-        #tables-list .btn-rejoin { flex: 0 0 auto; padding: 8px 14px; }
-        #tables-list .btn-table-del { padding: 8px 10px; min-width: 38px; height: 38px; border-radius: 10px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: .85rem; color: var(--muted); }
-        #tables-list .btn-table-del:hover { color: var(--red); background: var(--bg-2); }
+        .tables-list .trow-wrap { position: relative; overflow: hidden; border-radius: 14px; margin-bottom: 10px; user-select: none; }
+        .tables-list .trow-bg { position: absolute; inset: 0; background: var(--red); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; font-weight: 700; font-size: .88rem; z-index: 1; border-radius: 14px; }
+        .tables-list .trow { position: relative; z-index: 2; display: flex; align-items: center; gap: 10px; padding: 12px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; transition: transform .2s var(--ease); margin-bottom: 0 !important; }
+        .tables-list .tr-meta { flex: 1; min-width: 0; }
+        .tables-list .tr-id { font-weight: 700; font-size: .95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tables-list .tr-when { font-size: .74rem; color: var(--faint); }
+        .tables-list .tr-res { font-size: .85rem; color: var(--green); font-weight: 600; margin-top: 3px; }
+        .tables-list .tr-res.tr-none { color: var(--faint); font-weight: 400; font-style: italic; }
+        .tables-list .tr-actions { display: flex; gap: 6px; align-items: center; }
+        .tables-list .btn-rejoin { flex: 0 0 auto; padding: 8px 14px; }
+        .tables-list .btn-table-del { padding: 8px 10px; min-width: 38px; height: 38px; border-radius: 10px; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; font-size: .85rem; color: var(--muted); }
+        .tables-list .btn-table-del:hover { color: var(--red); background: var(--bg-2); }
         .lead-banner { align-items: center; gap: 12px; padding: 13px 16px; border-radius: 16px; margin-bottom: 14px; background: linear-gradient(120deg, var(--amber-soft), var(--accent-soft)); border: 1px solid var(--line); animation: fadeUp .35s var(--ease) both; }
         .lead-banner.won { background: var(--green-soft); border-color: var(--green); }
         .lead-banner .lb-ico { font-size: 1.7rem; }
@@ -459,6 +481,186 @@
         .empty .be { font-size: 2.6rem; display: block; margin-bottom: 10px; animation: bob 3.5s ease-in-out infinite; }
         .skel { height: 132px; border-radius: var(--r); margin-bottom: 14px; background: linear-gradient(100deg, var(--card) 30%, var(--bg-2) 50%, var(--card) 70%); background-size: 200% 100%; animation: shimmer 1.3s linear infinite; border: 1px solid var(--line); }
 
+        /* main menu dashboard components */
+        .menu-section { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 18px; }
+        .menu-section:first-of-type { border-top: none; padding-top: 0; }
+        .menu-section-title { font-size: .8rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; padding-left: 2px; }
+        .menu-card { background: var(--bg-2); border-radius: var(--r-sm); padding: 14px 16px; border: 1px solid var(--line-2); }
+        .menu-card-title { font-weight: 800; font-size: 1.15rem; color: var(--ink); letter-spacing: -.01em; }
+        .menu-card-subtitle { font-size: .85rem; color: var(--muted); margin-top: 2px; }
+        .menu-insight-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; font-size: .92rem; }
+        .menu-insight-row:last-child { margin-bottom: 0; }
+        .menu-insight-label { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .menu-insight-bar-bg { width: 100px; height: 6px; background: var(--line-2); border-radius: 999px; overflow: hidden; margin-left: 12px; }
+        .menu-insight-bar-fg { height: 100%; background: var(--accent); border-radius: 999px; }
+
+        /* Redesigned Current Table Card & Actions */
+        .menu-card.current-table-card {
+            background: var(--card);
+            border-radius: var(--r);
+            border: 1px solid var(--line);
+            box-shadow: var(--shadow-sm);
+            padding: 20px;
+            transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+        }
+        
+        .active-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: var(--green-soft);
+            color: var(--green);
+            font-size: 0.76rem;
+            font-weight: 800;
+            border-radius: 999px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        
+        .pulse-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--green);
+            position: relative;
+        }
+        .pulse-dot::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 2px solid var(--green);
+            opacity: 0;
+            animation: pulse-ring 2s cubic-bezier(0.215, 0.610, 0.355, 1) infinite;
+        }
+        
+        @keyframes pulse-ring {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { opacity: 0.5; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+        
+        .dashboard-btn-continue {
+            position: relative;
+            background: linear-gradient(135deg, var(--accent) 0%, #ff7a50 100%);
+            box-shadow: 0 8px 20px rgba(255, 90, 54, 0.24);
+            border-radius: 16px;
+            font-weight: 700;
+            transition: all 0.2s var(--ease);
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+        }
+        
+        .dashboard-btn-continue:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(255, 90, 54, 0.32);
+            filter: brightness(1.05);
+        }
+        
+        .dashboard-btn-continue:active {
+            transform: translateY(1px) scale(0.98);
+        }
+        
+        .dashboard-btn-continue .ic {
+            transition: transform 0.2s var(--ease);
+        }
+        
+        .dashboard-btn-continue:hover .ic {
+            transform: translateX(3px);
+        }
+        
+        .dashboard-btn-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+        
+        .dashboard-sub-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 12px 8px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            border-radius: 14px;
+            border: 1px solid var(--line-2);
+            background: var(--bg-2);
+            color: var(--ink-2);
+            transition: all 0.2s var(--ease);
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            .dashboard-sub-btn {
+                background: var(--bg-2);
+                border-color: var(--line);
+            }
+        }
+        
+        .dashboard-sub-btn .ic {
+            font-size: 1.3rem;
+            transition: transform 0.2s var(--ease);
+        }
+        
+        /* Button categories */
+        .dashboard-sub-btn.btn-invite {
+            --btn-color: var(--accent);
+            --btn-hover-bg: var(--accent-soft);
+        }
+        
+        .dashboard-sub-btn.btn-settings {
+            --btn-color: var(--amber);
+            --btn-hover-bg: #fff6eb;
+        }
+        @media (prefers-color-scheme: dark) {
+            .dashboard-sub-btn.btn-settings {
+                --btn-hover-bg: #2b2014;
+            }
+        }
+        
+        .dashboard-sub-btn.btn-leave {
+            --btn-color: var(--red);
+            --btn-hover-bg: var(--red-soft);
+        }
+        
+        .dashboard-sub-btn:hover {
+            border-color: var(--btn-color);
+            background: var(--btn-hover-bg);
+            color: var(--btn-color);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 14px rgba(80, 40, 20, 0.05);
+        }
+        
+        .dashboard-sub-btn:hover .ic {
+            transform: translateY(-2px) scale(1.08);
+        }
+        
+        .dashboard-sub-btn:active {
+            transform: translateY(1px);
+        }
+
+        #pc-menu-btn, #pc-leave-btn { display: none; }
+        @media (min-width: 900px) {
+            #pc-menu-btn { display: flex; }
+            #pc-leave-btn.visible { display: flex; }
+            #info-dashboard-leave-row { display: none !important; }
+        }
+
+        /* Hide find-wrap, members, and pc buttons when in dashboard view */
+        .dashboard .find-wrap, .dashboard .members, .dashboard #pc-menu-btn, .dashboard #pc-leave-btn { display: none !important; }
+
+        #sidebar-tables-list { display: none; }
+        @media (min-width: 900px) {
+            .dashboard #sidebar-tables-list { display: block; }
+            .dashboard #main-tables-list { display: none !important; }
+        }
+
         /* ---------------- Sheets (bottom) ---------------- */
         .scrim { position: fixed; inset: 0; z-index: 60; background: rgba(30, 16, 8, .42); backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity .3s; }
         .scrim.show { opacity: 1; pointer-events: auto; }
@@ -481,7 +683,7 @@
             .sheet-x { display: grid; }
         }
         .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--line-2); margin: 6px auto 14px; }
-        .sheet h3 { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; margin: 0 0 4px; padding-right: 46px; }
+        .sheet h3 { font-size: 1.4rem; font-weight: 800; letter-spacing: -.02em; margin: 0 0 4px; padding-right: 54px; }
         .sheet .sub { color: var(--ink-2); font-size: .96rem; line-height: 1.5; margin: 0 0 18px; }
         .row { display: flex; gap: 10px; }
         .row > * { flex: 1; }
@@ -609,7 +811,21 @@
         <input class="input" id="info-tablename" maxlength="40" placeholder="Name this table" style="margin-bottom:6px" />
         <div class="chip-hint" style="margin-bottom:16px">Shared with everyone at the table — anyone can change it.</div>
         <button class="btn block" id="info-invite" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5 8.6 10.5"/></svg> Invite friends</button>
-        <button class="btn soft block" id="info-new-table" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Start a fresh table</button>
+        <div class="row" id="info-dashboard-leave-row" style="margin-top:10px; gap:8px">
+            <button class="btn block" id="info-dashboard" style="flex:1"><svg class="ic" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg> Main Menu</button>
+            <button class="btn soft block" id="info-leave-table" style="flex:1;--accent:var(--red);--accent-soft:var(--red-soft)"><svg class="ic" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> Leave Table</button>
+        </div>
+    </div>
+
+    <!-- Start a fresh table sheet -->
+    <div class="sheet" id="sheet-new-table">
+        <div class="grab"></div>
+        <button class="sheet-x" aria-label="Close">✕</button>
+        <h3>Start a fresh table</h3>
+        <p class="sub">This clears the active options and starts a new table session. Past tables remain saved.</p>
+        <div class="field-label">Table Name</div>
+        <input class="input" id="new-table-name" maxlength="40" placeholder="e.g. Cosy Dinner" style="margin-bottom:18px" />
+        <button class="btn block lg" id="new-table-confirm">Confirm &amp; Start fresh</button>
     </div>
 
     <!-- Settings sheet -->
@@ -624,6 +840,12 @@
             <button class="btn ghost" id="set-emoji" style="flex:0 0 58px;font-size:1.5rem;padding:0" title="Change avatar"></button>
         </div>
         <div id="set-emoji-row" class="emoji-row" style="display:none;margin-bottom:8px"></div>
+        <div class="field-label" style="margin-top:16px">Appearance</div>
+        <div class="seg" id="theme-pick" style="margin-bottom:4px">
+            <div class="opt" data-th="light">☀️ Light</div>
+            <div class="opt" data-th="dark">🌙 Dark</div>
+            <div class="opt" data-th="auto">🔄 Auto</div>
+        </div>
         <div class="field-label" style="margin-top:16px">How you respond</div>
         <div id="mode-pick"></div>
         <div id="model-pick" style="margin-top:10px;display:none"></div>
@@ -660,14 +882,16 @@
         <button class="btn soft block" id="saved-clear" style="margin-top:14px">Clear all saved choices</button>
     </div>
 
-    <!-- Past tables sheet -->
+    <!-- Tables history sheet -->
     <div class="sheet" id="sheet-tables">
         <div class="grab"></div>
         <button class="sheet-x" aria-label="Close">✕</button>
         <h3>Past tables</h3>
-        <p class="sub">Every table you've hosted or joined. Rejoin if it's still going — if it's wrapped up, we'll let you know.</p>
-        <div id="tables-list"></div>
+        <p class="sub">Your dining history. Rejoin a table to see the options and votes again.</p>
+        <div id="sheet-tables-list" class="tables-list"></div>
     </div>
+
+
 
     <!-- Taste sheet (edit later) -->
     <div class="sheet" id="sheet-taste">
@@ -758,7 +982,7 @@
         /* ============================ state ============================ */
         const S = {
             me: { id: null, name: '', emoji: '😀', loves: [], avoids: [], diet: [], budget: '$$', radius: 2500, custom: '', history: {} },
-            settings: { mode: 'taste' }, // 'manual' | 'taste' | 'ai'
+            settings: { mode: 'taste', theme: 'auto' }, // mode: 'manual'|'taste'|'ai' ; theme: 'auto'|'light'|'dark'
             loc: null,                 // {lat, lon, label}
             onboarded: false,
             tableHost: null,           // host PEER id we joined (null if I'm host) — used to connect
@@ -769,6 +993,7 @@
             members: new Map(),        // id -> {id,name,emoji,prefs,online}
             options: [],               // {id,name,cuisine,lat,lon,dist,address,by,byName,reactions:{id:'in'|'ok'|'no'},won}
             seen: new Set(), seenOrder: [],
+            currentView: 'dashboard',
             load() {
                 try {
                     const p = JSON.parse(localStorage.getItem('mm2_me') || 'null'); if (p) this.me = { ...this.me, ...p };
@@ -802,6 +1027,7 @@
                     }
                 } catch (_) {}
                 if (!this.me.name) this.me.name = '';
+                this.currentView = this.tableId ? 'board' : 'dashboard';
             },
             save() {
                 this.saveTable();
@@ -1096,15 +1322,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 // and friends can auto-rejoin the same table.
                 const myId = localStorage.getItem('mm2_peerid') || ('tbl-' + uid(6));
                 return new Promise(res => {
-                    this.peer = new Peer(myId, {
-                        debug: 1,
-                        // config: {
-                        //     iceServers: [
-                        //         { urls: 'stun:stun.l.google.com:19302' },
-                        //         { urls: 'stun:global.stun.twilio.com:3478' }
-                        //     ]
-                        // }
-                    });
+                    this.peer = new Peer(myId, { debug: 1 });
                     this.peer.on('open', id => { this._retriedTaken = false; S.me.id = id; this.online = true; localStorage.setItem('mm2_peerid', id); res(id); });
                     this.peer.on('connection', c => this.wire(c, true));
                     this.peer.on('error', e => {
@@ -1160,6 +1378,13 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 if (S.seen.has(e.id)) return; this.seenAdd(e.id);
                 handle(e);
                 if (e.type !== 'SYNC' && e.ttl > 1) this.bcast({ ...e, ttl: e.ttl - 1 }, conn.peer);
+            },
+            disconnectAll() {
+                for (const [pid, conn] of this.conns) {
+                    try { conn.close(); } catch (_) {}
+                }
+                this.conns.clear();
+                S.members.clear();
             }
         };
         function env(type, payload, ttl = 5) { return { id: rid(), type, from: S.me.id, fromName: S.me.name, fromEmoji: S.me.emoji, ttl, ts: now(), payload }; }
@@ -1229,6 +1454,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
         }
         async function findPlaces() {
             if (searching) return;
+            ensureTable();
             if (!S.loc) { openSheet('sheet-loc'); return; }
             searching = true; renderApp();
             try {
@@ -1248,6 +1474,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                     address: c.address, by: S.me.id, byName: S.me.name, pitch: pitchFor(c, agg), reactions: {}, won: false
                 }));
                 S.options.push(...batch);
+                S.currentView = 'board';
                 S.save();
                 const km = (Math.max(agg.radius, 1200) / 1000);
                 lastSearchMsg = `Added ${batch.length} spot${batch.length === 1 ? '' : 's'} within ${km % 1 ? km.toFixed(1) : km} km of ${S.loc.label}, best match on top.`;
@@ -1486,8 +1713,8 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 const root = el('div', 'view'); root.id = 'app-root';
                 root.innerHTML = `
                     <div class="topbar">
-                        <div class="brand" id="brand" title="Tap to rename this table"><div class="logo">🍽️</div><div style="min-width:0"><div class="tt" id="table-title" style="overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;">MatchMeal</div><div class="ss" id="table-sub">tap to edit</div></div></div>
-                        <div class="statuspill" id="statpill"><span class="live"></span><span id="stat-label">online</span></div>
+                        <div class="brand" id="brand" title="Tap to change table name"><div class="logo">🍽️</div><div style="min-width:0;overflow:hidden;flex:1"><div class="tt" id="table-title">MatchMeal</div><div class="ss" id="table-sub">menu ☰</div></div></div>
+                        <div class="statuspill" id="statpill"><span class="live"></span><span id="stat-count">1</span><span class="stat-word" id="stat-word"></span></div>
                         <button class="iconbtn" id="open-settings"><svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg></button>
                     </div>
                     <div class="cols">
@@ -1500,12 +1727,63 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                                 <button class="btn block lg" id="find-btn"></button>
                                 <div class="find-hint" id="find-hint"></div>
                                 <button class="modechip" id="mode-chip" title="How you react to options — tap to change"></button>
+                                <button class="btn soft block" id="pc-menu-btn" style="margin-top:10px"><svg class="ic" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg> Main Menu</button>
+                                <button class="btn soft block" id="pc-leave-btn" style="margin-top:8px;--accent:var(--red);--accent-soft:var(--red-soft)"><svg class="ic" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> Leave Table</button>
+                            </div>
+                            <div id="sidebar-tables-list" class="menu-section" style="margin-top: 0;">
+                                <div class="menu-section-title">Past Tables</div>
+                                <div id="sidebar-tables-list-inner" class="tables-list"></div>
                             </div>
                         </aside>
                         <section class="main">
                             <div class="lead-banner" id="lead-banner" style="display:none"></div>
-                            <div class="sec-h"><h2>On the table</h2><span class="n" id="board-n"></span><button class="sortbtn" id="sort-btn" style="display:none"></button></div>
-                            <div id="board"></div>
+                            <div id="board-container">
+                                <div class="sec-h"><h2>On the table</h2><span class="n" id="board-n"></span><button class="sortbtn" id="sort-btn" style="display:none"></button></div>
+                                <div id="board"></div>
+                            </div>
+                            <div id="dashboard-view" style="display:none">
+                                <div class="sec-h"><h2>Main Dashboard</h2></div>
+                                <div class="menu-section">
+                                    <div class="menu-section-title">Current Table</div>
+                                    <div class="menu-card current-table-card">
+                                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+                                            <div>
+                                                <div class="menu-card-title" id="menu-current-table-name">Sunny Lunch</div>
+                                                <div class="menu-card-subtitle" id="menu-current-table-role">You are dining solo</div>
+                                            </div>
+                                            <div class="active-badge" id="menu-current-table-badge" style="display:none"><span class="pulse-dot"></span><span class="badge-label">Active</span></div>
+                                        </div>
+                                        <div class="row" id="menu-continue-row" style="margin-top:16px">
+                                            <button class="btn block lg dashboard-btn-continue" id="menu-continue-table" style="width:100%">Continue Table <svg class="ic" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>
+                                        </div>
+                                        <div class="row" id="menu-start-actions" style="margin-top:16px;display:none">
+                                            <button class="btn block lg dashboard-btn-continue" id="menu-start-table" style="width:100%">Start a Table <svg class="ic" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+                                        </div>
+                                        <div class="dashboard-btn-grid" id="menu-secondary-actions" style="margin-top:12px">
+                                            <button class="dashboard-sub-btn btn-invite" id="menu-invite">
+                                                <svg class="ic" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5 8.6 10.5"/></svg>
+                                                Invite
+                                            </button>
+                                            <button class="dashboard-sub-btn btn-settings" id="menu-settings-btn">
+                                                <svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+                                                Settings
+                                            </button>
+                                            <button class="dashboard-sub-btn btn-leave" id="menu-leave">
+                                                <svg class="ic" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+                                                Leave
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="menu-section">
+                                    <div class="menu-section-title">Your Taste Insights</div>
+                                    <div class="menu-card" id="menu-taste-insights"></div>
+                                </div>
+                                <div class="menu-section" id="main-tables-list" style="margin-bottom:20px">
+                                    <div class="menu-section-title">Past Tables</div>
+                                    <div id="tables-list" class="tables-list"></div>
+                                </div>
+                            </div>
                         </section>
                     </div>
                     <div class="footnote"><a href="classic.html">classic version</a> · © 2026 woodyhoko</div>`;
@@ -1514,22 +1792,75 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 $('open-settings').onclick = openSettings;
                 $('mode-chip').onclick = openSettings;
                 $('brand').onclick = () => {
+                    if (S.currentView === 'dashboard') return;
                     $('info-tablename').value = S.tableName || '';
                     openSheet('sheet-table-info');
                 };
-                $('brand').style.cursor = 'pointer';
+                $('pc-menu-btn').onclick = () => {
+                    if (!S.tableId) { S.currentView = 'dashboard'; }
+                    else { S.currentView = (S.currentView === 'dashboard') ? 'board' : 'dashboard'; }
+                    renderApp();
+                };
+                // wire up main menu dashboard buttons
+                $('menu-invite').onclick = () => { openShare(); };
+                $('menu-leave').onclick = leaveTable;
+                $('menu-continue-table').onclick = () => { S.currentView = 'board'; renderApp(); };
+                $('menu-start-table').onclick = () => { openNewTableSheet(); };
+                $('pc-leave-btn').onclick = leaveTable;
+                $('menu-settings-btn').onclick = () => {
+                    $('info-tablename').value = S.tableName || '';
+                    openSheet('sheet-table-info');
+                };
+                $('tables-list').onclick = handleTablesListClick;
+                if ($('sidebar-tables-list-inner')) {
+                    $('sidebar-tables-list-inner').onclick = handleTablesListClick;
+                }
+                if ($('sheet-tables-list')) {
+                    $('sheet-tables-list').onclick = handleTablesListClick;
+                }
+                setupSwipeHandlers();
+                setupSavedSwipeHandlers();
+
                 $('statpill').onclick = openMembers; $('statpill').style.cursor = 'pointer'; $('statpill').title = "See who's at the table";
                 $('find-btn').onclick = findPlaces;
                 $('sort-btn').onclick = () => { sortByRank = !sortByRank; renderBoard(); haptic(); toast(sortByRank ? 'Sorted by best match — updates live' : 'Back to the order they arrived', ''); };
                 $('locbar').onclick = () => openSheet('sheet-loc');
             }
+            if ($('app-root')) {
+                $('app-root').className = 'view ' + S.currentView;
+                $('brand').style.cursor = (S.currentView === 'dashboard') ? 'default' : 'pointer';
+            }
             if ($('info-tablename') && document.activeElement !== $('info-tablename')) $('info-tablename').value = S.tableName || '';
             // status
-            const np = Mesh.conns.size;
-            $('stat-label').textContent = Mesh.online ? (np ? `${np + 1} here` : 'online') : 'offline';
+            const onlineCount = liveMembers().length;
+            if (Mesh.online) {
+                $('stat-count').textContent = `${onlineCount}`;
+                $('stat-word').textContent = onlineCount > 1 ? ' here' : ' online';
+            } else {
+                $('stat-count').textContent = '–';
+                $('stat-word').textContent = ' offline';
+            }
             $('statpill').className = 'statuspill' + (Mesh.online ? '' : ' off');
-            $('table-title').textContent = S.tableName || 'MatchMeal';
-            $('table-sub').textContent = 'tap to edit';
+            if (S.currentView === 'dashboard') {
+                $('table-title').textContent = 'Match Meal';
+                $('table-sub').textContent = '';
+            } else {
+                $('table-title').textContent = S.tableName || 'Match Meal';
+                $('table-sub').textContent = 'tap to edit ✏️';
+            }
+
+            const leaveHtml = `<svg class="ic" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> Leave Table`;
+            
+            if (S.tableId) {
+                $('info-leave-table').style.display = 'flex';
+                setRegion($('info-leave-table'), leaveHtml);
+            } else {
+                $('info-leave-table').style.display = 'none';
+            }
+            if ($('pc-leave-btn')) {
+                $('pc-leave-btn').classList.toggle('visible', !!S.tableId);
+                setRegion($('pc-leave-btn'), leaveHtml);
+            }
             // members + share
             renderMembers();
             // location (guarded so it never re-renders/flashes when unchanged)
@@ -1537,17 +1868,29 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 ? `<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> <b>${esc(S.loc.label)}</b> <span class="chg">change</span>`
                 : `<svg class="ic" viewBox="0 0 24 24"><circle cx="12" cy="10" r="3"/><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11Z"/></svg> <span style="color:var(--muted)">Set your location to search</span> <span class="chg">set</span>`);
             // find button
-            $('find-btn').disabled = searching || !S.loc;
+            $('find-btn').disabled = searching || !S.loc || !S.tableId;
             setRegion($('find-btn'), searching
                 ? `<svg class="ic" viewBox="0 0 24 24" style="animation:spin 1s linear infinite"><path d="M21 12a9 9 0 1 1-6.2-8.5"/></svg> Finding great spots…`
-                : `<svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg> ${!S.loc ? 'Set your location first' : (S.options.length ? 'Show 6 more options' : 'Find places nearby')}`);
-            $('find-hint').textContent = searching ? '' : (lastSearchMsg || (!S.loc ? '' : (np ? "ranked by everyone's taste at the table" : 'invite friends first, or find a place solo')));
+                : `<svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg> ${!S.tableId ? 'Start a table first' : (!S.loc ? 'Set your location first' : (S.options.length ? 'Show 6 more options' : 'Find places nearby'))}`);
+            $('find-hint').textContent = searching ? '' : (lastSearchMsg || (!S.tableId ? 'Start a table to search' : (!S.loc ? '' : ((onlineCount > 1) ? "ranked by everyone's taste at the table" : 'invite friends first, or find a place solo'))));
             // response-mode chip (this is where you can tell whether AI is in use)
             const mm = modeMeta();
             setRegion($('mode-chip'), `<span class="mc-ico">${mm.i}</span><span>You react: <b class="mc-k">${mm.k}</b></span><span class="mc-go">Change ›</span>`);
-            // board + match summary
-            renderBoard();
-            updateLead();
+            // Toggle dashboard vs board
+            const showDash = (S.currentView === 'dashboard') || !S.tableId;
+            $('board-container').style.display = showDash ? 'none' : 'block';
+            $('dashboard-view').style.display = showDash ? 'block' : 'none';
+            
+            // update pc menu button label and state
+            $('pc-menu-btn').innerHTML = `<svg class="ic" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg> Main Dashboard`;
+
+            if (showDash) {
+                if ($('lead-banner')) $('lead-banner').style.display = 'none';
+                renderMainMenu();
+            } else {
+                renderBoard();
+                updateLead();
+            }
         }
         // Match board: the current front-runner everyone's converging on.
         function updateLead() {
@@ -1944,10 +2287,14 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             const myId = S.me.id || localStorage.getItem('mm2_peerid') || '';
             const alive = liveMembers().map(m => m.id).filter(Boolean);
             const list = [myId, ...alive.filter(id => id !== myId)].filter(id => id && id !== 'undefined' && id !== 'null');
+            if (location.protocol === 'file:') {
+                return `https://space.hoko.xyz/match-meal/?t=${list.join(',')}`;
+            }
             return `${location.origin}${location.pathname}?t=${list.join(',')}`;
         }
         let qrDone = false;
         function openShare() {
+            ensureTable();
             const url = shareUrl();
             $('share-title').textContent = `Invite to ${S.tableName || 'table'}`;
             $('share-link').textContent = url.replace(/^https?:\/\//, '');
@@ -2007,11 +2354,34 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             host.style.display = show ? '' : 'none';
             host.innerHTML = show ? modelPickHtml() : '';
         }
+        function applyTheme(theme) {
+            if (theme === 'auto') {
+                document.documentElement.removeAttribute('data-theme');
+            } else {
+                document.documentElement.setAttribute('data-theme', theme);
+            }
+        }
+        // Apply on load
+        applyTheme(S.settings.theme || 'auto');
+
         function syncSettingsSheet() {
             $('set-name').value = S.me.name;
             $('set-emoji').textContent = S.me.emoji;
             $('set-emoji-row').style.display = 'none';
             $('set-emoji-row').innerHTML = AVATARS.map(a => `<button class="emoji-pick ${a === S.me.emoji ? 'on' : ''}" data-e="${a}">${a}</button>`).join('');
+            // Theme picker
+            const currentTheme = S.settings.theme || 'auto';
+            $('theme-pick').querySelectorAll('.opt').forEach(btn => {
+                btn.classList.toggle('on', btn.dataset.th === currentTheme);
+            });
+            $('theme-pick').onclick = e => {
+                const btn = e.target.closest('[data-th]'); if (!btn) return;
+                S.settings.theme = btn.dataset.th;
+                S.save();
+                applyTheme(S.settings.theme);
+                $('theme-pick').querySelectorAll('.opt').forEach(b => b.classList.toggle('on', b === btn));
+                haptic();
+            };
             wireModePick($('mode-pick'), () => S.settings.mode, m => {
                 const prev = S.settings.mode; S.settings.mode = m; S.save(); renderApp(); renderModelPick();
                 if (m !== 'manual' && prev !== m) {
@@ -2026,9 +2396,159 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             const b = e.target.closest('[data-mid]'); if (!b) return;
             setBrowserModel(b.dataset.mid); renderModelPick(); haptic();
         };
-        // table rename — anyone at the table can do it; broadcast to everyone
+        function getPreferenceDistribution() {
+            const counts = {};
+            const h = S.me.history || {};
+            for (const k in h) {
+                const item = h[k];
+                if (item.r === 'in' || item.r === 'ok') {
+                    const cuisines = (item.cuisine || 'Other').split(/[,/·]/).map(x => x.trim()).filter(Boolean);
+                    cuisines.forEach(c => {
+                        const name = c.toLowerCase();
+                        counts[name] = (counts[name] || 0) + (item.r === 'in' ? 2 : 1);
+                    });
+                }
+            }
+            return Object.entries(counts)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 5)
+                .map(([name, weight]) => ({ name: cap(name), weight }));
+        }
+
+        function renderMainMenu() {
+            if (S.tableId) {
+                // Show continue + secondary actions, hide start
+                $('menu-continue-row').style.display = 'flex';
+                $('menu-secondary-actions').style.display = 'grid';
+                $('menu-start-actions').style.display = 'none';
+
+                // Drive the Active badge with live connection state
+                const badge = $('menu-current-table-badge');
+                if (badge) {
+                    const onlineCount = liveMembers ? liveMembers().length : 1;
+                    const isOnline = Mesh.online;
+                    badge.style.display = 'inline-flex';
+                    // Badge turns grey when offline
+                    badge.style.background = isOnline ? '' : 'var(--bg-2)';
+                    badge.style.color = isOnline ? '' : 'var(--muted)';
+                    const dot = badge.querySelector('.pulse-dot');
+                    if (dot) {
+                        dot.style.background = isOnline ? '' : 'var(--faint)';
+                        dot.style.animation = isOnline ? '' : 'none';
+                    }
+                    const labelSpan = badge.querySelector('.badge-label');
+                    if (labelSpan) {
+                        if (!isOnline) {
+                            labelSpan.textContent = 'Offline';
+                        } else if (onlineCount > 1) {
+                            labelSpan.textContent = `${onlineCount} here`;
+                        } else {
+                            labelSpan.textContent = 'Active';
+                        }
+                    }
+                    // Clicking the badge in table context opens members
+                    badge.onclick = S.currentView !== 'dashboard' ? null : null;
+                }
+
+                $('menu-current-table-name').textContent = S.tableName || 'MatchMeal';
+                if (S.tableHost) {
+                    $('menu-current-table-role').textContent = `You joined a table hosted by ${S.tableHost.slice(4, 10)}`;
+                } else if (Mesh.conns.size > 0) {
+                    $('menu-current-table-role').textContent = `You are hosting ${Mesh.conns.size} guest${Mesh.conns.size === 1 ? '' : 's'}`;
+                } else {
+                    $('menu-current-table-role').textContent = 'You are dining solo';
+                }
+            } else {
+                // Show start, hide continue + secondary actions
+                $('menu-continue-row').style.display = 'none';
+                $('menu-secondary-actions').style.display = 'none';
+                $('menu-start-actions').style.display = 'flex';
+
+                // Hide active badge when no table
+                const badge = $('menu-current-table-badge');
+                if (badge) badge.style.display = 'none';
+
+                $('menu-current-table-name').textContent = 'No Active Table';
+                $('menu-current-table-role').textContent = 'Create a table to invite friends';
+            }
+
+            // Render Taste Insights
+            const insights = getPreferenceDistribution();
+            const insightsEl = $('menu-taste-insights');
+            if (insights.length === 0) {
+                insightsEl.innerHTML = '<p class="sub" style="margin:0;font-size:.88rem;text-align:center">No taste history yet. React to some restaurants to see your insights!</p>';
+            } else {
+                const maxWeight = Math.max(...insights.map(i => i.weight));
+                insightsEl.innerHTML = insights.map(i => {
+                    const pct = Math.max(10, Math.round((i.weight / maxWeight) * 100));
+                    return `<div class="menu-insight-row">
+                        <div class="menu-insight-label">${esc(i.name)}</div>
+                        <div style="display:flex;align-items:center">
+                            <span class="mcount" style="font-size:.8rem">${i.weight} pts</span>
+                            <div class="menu-insight-bar-bg">
+                                <div class="menu-insight-bar-fg" style="width: ${pct}%"></div>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+
+            // Render embedded table history list
+            renderTables();
+        }
+
+        const leaveTable = async () => {
+            const title = 'Leave this table?';
+            const message = 'This disconnects you from the table and returns you to the main dashboard. Your past tables stay saved.';
+            const confirmText = 'Leave';
+            
+            if (await confirmDialog({ icon: '🚪', title, message, confirm: confirmText, cancel: 'Cancel', danger: true })) {
+                Mesh.disconnectAll();
+                S.options = []; S.members.clear(); S.tableHost = null; S.lastTable = null; cardEls.clear(); $('board').innerHTML = '';
+                S.tableId = null; S.tableName = null;
+                try { localStorage.removeItem('mm2_lasttable'); } catch (_) {}
+                S.currentView = 'dashboard';
+                S.save(); renderApp(); closeSheets();
+                toast('Left the table', 'good');
+            }
+        };
+
+        const openNewTableSheet = () => {
+            const nameInput = $('new-table-name');
+            nameInput.value = genTableName();
+            openSheet('sheet-new-table');
+            setTimeout(() => nameInput.focus(), 350);
+        };
+
+        // wire up table settings popup
         $('info-tablename').onchange = e => { const v = e.target.value.trim(); if (v) setTableName(v); else $('info-tablename').value = S.tableName || ''; };
         $('info-tablename').onkeydown = e => { if (e.key === 'Enter') e.target.blur(); };
+        $('info-invite').onclick = () => { openShare(); };
+        $('info-dashboard').onclick = () => {
+            S.currentView = 'dashboard';
+            renderApp();
+            closeSheets();
+        };
+        $('info-leave-table').onclick = leaveTable;
+        
+        $('new-table-name').onkeydown = e => { if (e.key === 'Enter') $('new-table-confirm').click(); };
+        $('new-table-confirm').onclick = async () => {
+            const name = $('new-table-name').value.trim();
+            if (!name) return;
+            
+            Mesh.disconnectAll();
+            S.options = []; S.members.clear(); S.tableHost = null; S.lastTable = null; cardEls.clear(); $('board').innerHTML = '';
+            S.tableId = null; S.tableName = name; ensureTable(); recordCurrentTable();
+            try { localStorage.removeItem('mm2_lasttable'); } catch (_) {}
+            S.currentView = 'board';
+            
+            S.save();
+            renderApp();
+            closeSheets();
+            openShare();
+            toast(`New table: ${S.tableName}`, 'good');
+        };
+
         // name + avatar editing (broadcasts so peers see the change live)
         $('set-name').oninput = e => { S.me.name = e.target.value; };
         $('set-name').onchange = () => { if (!S.me.name.trim()) S.me.name = 'Guest ' + uid(2); S.save(); broadcastPrefs(); renderApp(); $('set-name').value = S.me.name; toast('Name updated', 'good'); };
@@ -2037,19 +2557,6 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
         // Settings sub-pages open as CHILDREN of Settings, so Back/Save returns there.
         $('saved-prefs').onclick = () => openSaved(true);
         $('edit-taste').onclick = () => openTaste(true);
-
-        const startFreshTable = async () => {
-            if (await confirmDialog({ icon: '🧹', title: 'Start a fresh table?', message: 'This clears the current options for you and begins a brand-new empty table. Your past tables stay saved.', confirm: 'Start fresh', cancel: 'Keep this table', danger: true })) {
-                S.options = []; S.members.clear(); S.tableHost = null; S.lastTable = null; cardEls.clear(); $('board').innerHTML = '';
-                S.tableId = null; S.tableName = null; ensureTable(); recordCurrentTable();   // brand-new table identity
-                try { localStorage.removeItem('mm2_lasttable'); } catch (_) {}
-                S.save(); renderApp(); closeSheets();
-                openShare();
-                toast(`New table: ${S.tableName}`, 'good');
-            }
-        };
-        $('info-new-table').onclick = startFreshTable;
-        $('info-invite').onclick = () => { openShare(); };
 
         // who's at the table
         function openMembers(asChild) {
@@ -2128,111 +2635,133 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             S.save();
         }
         let tableFilter = 'decided';   // 'decided' (default) | 'all'
-        function openTables(asChild) { renderTables(); openSheet('sheet-tables', asChild); }
+        function openTables(asChild) {
+            renderTables();
+            openSheet('sheet-tables', asChild);
+        }
         function renderTables() {
             const list = $('tables-list');
+            const sidebarList = $('sidebar-tables-list-inner');
+            const sheetList = $('sheet-tables-list');
             let th = (S.me.tableHistory || []).slice().sort((a, b) => (b.ts || 0) - (a.ts || 0));
+            // Never show the currently active table in the past tables list
+            if (S.tableId) th = th.filter(t => t.id !== S.tableId);
             if (tableFilter === 'decided') th = th.filter(t => t.result);
-            const filterBar = `<div class="seg" id="tables-filter" style="margin-bottom:14px">
+            const filterBar = `<div class="seg" style="margin-bottom:14px">
                 <div class="opt ${tableFilter === 'decided' ? 'on' : ''}" data-f="decided">Decided</div>
                 <div class="opt ${tableFilter === 'all' ? 'on' : ''}" data-f="all">All</div></div>`;
+            
+            let htmlContent = '';
             if (!th.length) {
-                list.innerHTML = filterBar + `<p class="sub">${tableFilter === 'decided' ? 'No decided tables yet — lock a place in and it shows up here.' : 'No tables yet. Host or join one and it’ll appear here.'}</p>`;
-                return;
+                htmlContent = filterBar + `<p class="sub">${tableFilter === 'decided' ? 'No decided tables yet — lock a place in and it shows up here.' : 'No tables yet. Host or join one and it’ll appear here.'}</p>`;
+            } else {
+                htmlContent = filterBar + th.map(t => {
+                    const when = new Date(t.ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    const host = t.host || t.id, mine = t.mine || host === S.me.id;
+                    const name = t.name || (mine ? 'Your table' : 'Table ' + String(t.id || '').slice(-4));
+                    const res = t.result ? `<div class="tr-res">🏆 ${esc(t.result.name)}</div>` : '<div class="tr-res tr-none">⏳ still deciding</div>';
+                    return `<div class="trow-wrap" data-join="${esc(t.id)}">
+                        <div class="trow-bg">
+                            <span>🗑️ Delete</span>
+                            <span>Delete 🗑️</span>
+                        </div>
+                        <div class="trow">
+                            <div class="tr-meta">
+                                <div class="tr-id">${esc(name)}</div>
+                                <div class="tr-when">${esc(when)}${mine ? ' · you host' : ''}</div>
+                                ${res}
+                            </div>
+                            <div class="tr-actions">
+                                <button class="btn soft btn-rejoin" data-join="${esc(t.id)}">Rejoin</button>
+                                <button class="btn ghost btn-table-del" data-del="${esc(t.id)}" title="Delete table">✕</button>
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('');
             }
-            list.innerHTML = filterBar + th.map(t => {
-                const when = new Date(t.ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-                const host = t.host || t.id, mine = t.mine || host === S.me.id;
-                const name = t.name || (mine ? 'Your table' : 'Table ' + String(t.id || '').slice(-4));
-                const res = t.result ? `<div class="tr-res">🏆 ${esc(t.result.name)}</div>` : '<div class="tr-res tr-none">⏳ still deciding</div>';
-                return `<div class="trow-wrap" data-join="${esc(t.id)}">
-                    <div class="trow-bg">
-                        <span>🗑️ Delete</span>
-                        <span>Delete 🗑️</span>
-                    </div>
-                    <div class="trow">
-                        <div class="tr-meta">
-                            <div class="tr-id">${esc(name)}</div>
-                            <div class="tr-when">${esc(when)}${mine ? ' · you host' : ''}</div>
-                            ${res}
-                        </div>
-                        <div class="tr-actions">
-                            <button class="btn soft btn-rejoin" data-join="${esc(t.id)}">Rejoin</button>
-                            <button class="btn ghost btn-table-del" data-del="${esc(t.id)}" title="Delete table">✕</button>
-                        </div>
-                    </div>
-                </div>`;
-            }).join('');
+            if (list) list.innerHTML = htmlContent;
+            if (sidebarList) sidebarList.innerHTML = htmlContent;
+            if (sheetList) sheetList.innerHTML = htmlContent;
         }
         function loadTableFromHistory(t) {
-            S.tableId = t.id;
-            S.tableName = t.name;
-            S.tableHost = t.mine ? null : t.host;
-            S.options = (t.options || []).map(o => ({ ...o, reactions: o.reactions || {}, notes: o.notes || {} }));
-            S.members.clear();
-            (t.members || []).forEach(m => {
-                if (m.id && m.id !== S.me.id) {
-                    S.members.set(m.id, { ...m, online: false });
-                }
-            });
-            S.lastTable = { id: S.tableHost || S.me.id, ts: now() };
-            S.save();
-            renderApp();
-            
-            if (t.peers && t.peers.length) {
-                t.peers.forEach((pid, index) => {
-                    if (pid !== S.me.id) {
-                        setTimeout(() => Mesh.connect(pid), 200 + index * 100);
+            try {
+                S.tableId = t.id;
+                S.tableName = t.name;
+                S.tableHost = t.mine ? null : t.host;
+                S.options = (t.options || []).map(o => ({ ...o, reactions: o.reactions || {}, notes: o.notes || {} }));
+                S.members.clear();
+                (t.members || []).forEach(m => {
+                    if (m.id && m.id !== S.me.id) {
+                        S.members.set(m.id, { ...m, online: false });
                     }
                 });
-            }
-            if (S.tableHost && S.tableHost !== S.me.id && (!t.peers || !t.peers.includes(S.tableHost))) {
-                setTimeout(() => Mesh.connect(S.tableHost), 200);
-            }
-            
-            const url = S.tableHost ? `${location.origin}${location.pathname}?t=${S.tableHost}` : `${location.origin}${location.pathname}`;
-            history.replaceState(null, '', url);
-            toast('Rejoined table: ' + S.tableName, 'good');
-        }
-        $('tables-list').onclick = async e => {
-            const f = e.target.closest('[data-f]');
-            if (f) { tableFilter = f.dataset.f; renderTables(); haptic(); return; }
-            
-            const del = e.target.closest('[data-del]');
-            if (del) {
-                const tableId = del.dataset.del;
-                const t = (S.me.tableHistory || []).find(x => x.id === tableId);
-                let confirmDelete = true;
-                if (t && t.result) {
-                    confirmDelete = await confirmDialog({
-                        icon: '⚠️',
-                        title: 'Delete this record?',
-                        message: `This table decided on "${t.result.name}". Keeping it provides a nice record of your visits. Are you sure you want to delete it?`,
-                        confirm: 'Delete',
-                        cancel: 'Keep it',
-                        danger: true
+                S.lastTable = { id: S.tableHost || S.me.id, ts: now() };
+                S.currentView = 'board';
+                S.save();
+                renderApp();
+                
+                if (t.peers && t.peers.length) {
+                    t.peers.forEach((pid, index) => {
+                        if (pid !== S.me.id) {
+                            setTimeout(() => Mesh.connect(pid), 200 + index * 100);
+                        }
                     });
                 }
-                if (confirmDelete) {
-                    S.me.tableHistory = (S.me.tableHistory || []).filter(x => x.id !== tableId);
-                    if (S.tableId === tableId) {
-                        S.tableId = null; S.tableName = null; S.tableHost = null; S.lastTable = null; S.options = []; S.members.clear(); cardEls.clear(); $('board').innerHTML = '';
-                        ensureTable(); recordCurrentTable();
-                    }
-                    S.save();
-                    renderTables();
+                if (S.tableHost && S.tableHost !== S.me.id && (!t.peers || !t.peers.includes(S.tableHost))) {
+                    setTimeout(() => Mesh.connect(S.tableHost), 200);
                 }
-                haptic();
-                return;
+                
+                const url = S.tableHost ? `${location.origin}${location.pathname}?t=${S.tableHost}` : `${location.origin}${location.pathname}`;
+                history.replaceState(null, '', url);
+                toast('Rejoined table: ' + S.tableName, 'good');
+            } catch (err) {
+                alert("Error in loadTableFromHistory: " + err.message + "\n" + err.stack);
             }
-            
-            const j = e.target.closest('[data-join]'); if (!j) return;
-            const t = (S.me.tableHistory || []).find(x => x.id === j.dataset.join); if (!t) return;
-            
-            loadTableFromHistory(t);
-            closeSheets();
-            haptic();
-        };
+        }
+        async function handleTablesListClick(e) {
+            try {
+                const f = e.target.closest('[data-f]');
+                if (f) { tableFilter = f.dataset.f; renderTables(); haptic(); return; }
+                
+                const del = e.target.closest('[data-del]');
+                if (del) {
+                    const tableId = del.dataset.del;
+                    const t = (S.me.tableHistory || []).find(x => x.id === tableId);
+                    let confirmDelete = true;
+                    if (t && t.result) {
+                        confirmDelete = await confirmDialog({
+                            icon: '⚠️',
+                            title: 'Delete this record?',
+                            message: `This table decided on "${t.result.name}". Keeping it provides a nice record of your visits. Are you sure you want to delete it?`,
+                            confirm: 'Delete',
+                            cancel: 'Keep it',
+                            danger: true
+                        });
+                    }
+                    if (confirmDelete) {
+                        S.me.tableHistory = (S.me.tableHistory || []).filter(x => x.id !== tableId);
+                        if (S.tableId === tableId) {
+                            S.tableId = null; S.tableName = null; S.tableHost = null; S.lastTable = null; S.options = []; S.members.clear(); cardEls.clear(); $('board').innerHTML = '';
+                            S.currentView = 'dashboard';
+                        }
+                        S.save();
+                        renderTables();
+                    }
+                    haptic();
+                    return;
+                }
+                
+                // Only the explicit Rejoin button should trigger rejoining — not taps on the row wrapper
+                const j = e.target.closest('.btn-rejoin[data-join]'); if (!j) return;
+                const t = (S.me.tableHistory || []).find(x => x.id === j.dataset.join); if (!t) return;
+                
+                loadTableFromHistory(t);
+                closeSheets();
+                haptic();
+            } catch (err) {
+                alert("Error in handleTablesListClick: " + err.message + "\n" + err.stack);
+            }
+        }
 
         // taste editor sheet
         function openTaste(asChild) {
@@ -2293,10 +2822,13 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
 
         /* ============================ boot ============================ */
         async function boot() {
-            // Paint the app immediately (with any restored options) so the screen is
-            // never blank while the P2P node connects. Guarded by an existing id so the
-            // just-onboarded path (no id until Mesh.start) doesn't flash the onboarding.
-            if (S.me.id) render();
+            // Paint the app immediately so the screen is never blank while booting.
+            if (!S.me.id) {
+                S.me.id = localStorage.getItem('mm2_peerid') || ('tbl-' + uid(6));
+                localStorage.setItem('mm2_peerid', S.me.id);
+            }
+            S.currentView = S.tableId ? 'board' : 'dashboard';
+            render();
             // bring my node online
             try { await Mesh.start(); } catch (e) { console.error(e); }
             // join a table from the link, or auto-rejoin the last table on refresh
@@ -2304,7 +2836,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             const fromLink = !!new URLSearchParams(location.search).get('t');
             const histEntry = S.tableId ? (S.me.tableHistory || []).find(x => x.id === S.tableId) : null;
             const tList = tStr ? tStr.split(',').map(x => x.trim()).filter(Boolean) : [];
-            const isGuest = tList.length > 0 && tList[0] !== S.me.id && tList[0] !== 'undefined' && tList[0] !== 'null';
+            const isGuest = S.tableHost !== null && tList.length > 0 && tList[0] !== S.me.id && tList[0] !== 'undefined' && tList[0] !== 'null';
             if (isGuest) {
                 S.tableHost = tList[0]; S.lastTable = { id: tStr, ts: now() };
                 tList.forEach((pid, index) => {
@@ -2324,22 +2856,23 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 if (!fromLink) toast('Rejoining your last table…');
             } else {
                 S.tableHost = null;
-                ensureTable();          // I'm the host — make sure my table has a name + id
-                recordCurrentTable();
-                if (histEntry && histEntry.peers) {
-                    setTimeout(() => {
-                        histEntry.peers.forEach(pid => {
-                            if (pid !== S.me.id && pid !== 'undefined' && pid !== 'null') {
-                                Mesh.connect(pid);
-                            }
-                        });
-                    }, 1000);
+                if (S.tableId) {
+                    recordCurrentTable();
+                    if (histEntry && histEntry.peers) {
+                        setTimeout(() => {
+                            histEntry.peers.forEach(pid => {
+                                if (pid !== S.me.id && pid !== 'undefined' && pid !== 'null') {
+                                    Mesh.connect(pid);
+                                }
+                            });
+                        }, 1000);
+                    }
                 }
             }
             S.save();
             render();   // refresh now that we're online (status pill, peers, etc.)
             // share prompt for fresh hosts only
-            if (!tStr && !S.options.length) setTimeout(() => { if (!Mesh.conns.size) openShare(); }, 700);
+            if (S.tableId && !tStr && !S.options.length) setTimeout(() => { if (!Mesh.conns.size) openShare(); }, 700);
         }
         // ---- table identity (a table has its OWN id, separate from the host's peer id,
         // so the same host's successive tables stay distinct in your history) ----
@@ -2426,7 +2959,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                     S.me.tableHistory = (S.me.tableHistory || []).filter(x => x.id !== tableId);
                     if (S.tableId === tableId) {
                         S.tableId = null; S.tableName = null; S.tableHost = null; S.lastTable = null; S.options = []; S.members.clear(); cardEls.clear(); $('board').innerHTML = '';
-                        ensureTable(); recordCurrentTable();
+                        S.currentView = 'dashboard';
                     }
                     S.save();
                     wrap.style.transition = 'height 0.2s, opacity 0.2s, margin 0.2s';
@@ -2446,11 +2979,11 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             swipeEl = null;
         };
 
-        const setupSwipeHandlers = () => {
-            const list = $('tables-list');
+        const setupSwipeHandlersFor = (listId) => {
+            const list = $(listId);
             if (!list) return;
             list.addEventListener('touchstart', e => {
-                const row = e.target.closest('#tables-list .trow');
+                const row = e.target.closest('#' + listId + ' .trow');
                 if (!row || e.target.closest('button')) return;
                 swipeEl = row;
                 startX = e.touches[0].clientX;
@@ -2482,7 +3015,7 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
             list.addEventListener('touchcancel', endSwipe);
 
             list.addEventListener('mousedown', e => {
-                const row = e.target.closest('#tables-list .trow');
+                const row = e.target.closest('#' + listId + ' .trow');
                 if (!row || e.target.closest('button')) return;
                 swipeEl = row;
                 startX = e.clientX;
@@ -2491,6 +3024,12 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 isSwiping = false;
                 swipeEl.style.transition = 'none';
             });
+        };
+
+        const setupSwipeHandlers = () => {
+            setupSwipeHandlersFor('tables-list');
+            setupSwipeHandlersFor('sidebar-tables-list-inner');
+            setupSwipeHandlersFor('sheet-tables-list');
         };
 
         let savedSwipeEl = null, savedStartX = 0, savedStartY = 0, savedCurrentX = 0, savedIsDragging = false, savedIsSwiping = false;
@@ -2618,9 +3157,6 @@ Reply with ONE JSON object and nothing else, with "reason" first, e.g. {"reason"
                 if (!gpuOK() && S.settings.mode === 'browser') S.settings.mode = 'taste';
                 if (CUR === 'ob' && obStep === 3) renderOnboard();
             }).catch(() => {});
-            
-            setupSwipeHandlers();
-            setupSavedSwipeHandlers();
             
             window.addEventListener('beforeunload', () => {
                 if (Mesh.peer && !Mesh.peer.destroyed) {
